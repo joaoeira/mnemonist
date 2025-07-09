@@ -99,6 +99,10 @@ class ThreadService extends Effect.Service<ThreadService>()(
 								),
 							),
 							{ concurrency: "unbounded" },
+						).pipe(
+							Effect.map((items) => {
+								return items.filter((item) => !item.deletedAt); // dont return deleted items
+							}),
 						);
 
 						return items;
