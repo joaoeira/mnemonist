@@ -5,17 +5,14 @@
 .rich-text-editor {
 	height: 64px;
 	padding: 12px;
-	border: 1px solid #e0e0e0;
-	border-radius: 4px;
-	background-color: #fff;
+	background-color: transparent;
 	font-size: 14px;
 	line-height: 1.5;
 	outline: none;
-	transition: border-color 0.2s;
 }
 
 .rich-text-editor:focus {
-	border-color: #4a90e2;
+	background-color: color-mix(in srgb, var(--background) 60%, transparent);
 }
 
 .rich-text-editor p {

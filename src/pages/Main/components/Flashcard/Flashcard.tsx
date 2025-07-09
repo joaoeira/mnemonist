@@ -1,6 +1,8 @@
 import { FetchHttpClient } from "@effect/platform";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Effect } from "effect";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import type { Flashcard as FlashcardType } from "../../../../domain/flashcard/schema";
 import { FlashcardService } from "../../../../domain/flashcard/service";
 import type { Thread } from "../../../../domain/thread/schema";
@@ -132,33 +134,38 @@ export default function Flashcard({
     },
   });
 
+  // lets work theme next,  so that we arent adding bs on top of bs
+
   return (
-    <div className="w-full max-w-2xl mx-2 bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden">
-      <div className="p-2 space-y-2">
-        <div className="border border-gray-300 rounded-md focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500">
-          <RichTextArea
-            value={question}
-            onChange={(question) => {
-              updateFlashcard({ question });
-            }}
-            placeholder="Enter your question here..."
-          />
-        </div>
+    <Card className="w-full max-w-2xl mx-2 p-0 overflow-hidden">
+      <div>
+        <RichTextArea
+          value={question}
+          onChange={(question) => {
+            updateFlashcard({ question });
+          }}
+          placeholder="Enter your question here..."
+        />
+        <div className="bg-background h-px min-w-full" />
 
-        <div className="border border-gray-300 rounded-md focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500">
-          <RichTextArea
-            value={answer}
-            onChange={(answer) => {
-              updateFlashcard({ answer });
-            }}
-            placeholder="Enter your answer here..."
-          />
-        </div>
+        <RichTextArea
+          value={answer}
+          onChange={(answer) => {
+            updateFlashcard({ answer });
+          }}
+          placeholder="Enter your answer here..."
+        />
 
-        <div className="flex justify-end pt-4 border-t border-gray-200">
-          <button
-            type="button"
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+        <div className="flex justify-end space-x-2 p-3 border-t border-gray-200">
+          <Button
+            onClick={() => {
+              evaluateFlashcard({ question, answer });
+            }}
+          >
+            Evaluate
+          </Button>
+
+          <Button
             onClick={() => {
               saveFlashcard(undefined, {
                 onSuccess: (noteId) => {
@@ -167,19 +174,10 @@ export default function Flashcard({
               });
             }}
           >
-            Save Flashcard
-          </button>
-          <button
-            type="button"
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors ml-2"
-            onClick={() => {
-              evaluateFlashcard({ question, answer });
-            }}
-          >
-            Evaluate
-          </button>
+            Add
+          </Button>
         </div>
       </div>
-    </div>
+    </Card>
   );
 }
