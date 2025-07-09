@@ -1,0 +1,54 @@
+.rich-text-area {
+	width: 100%;
+}
+
+.rich-text-editor {
+	height: 64px;
+	padding: 12px;
+	border: 1px solid #e0e0e0;
+	border-radius: 4px;
+	background-color: #fff;
+	font-size: 14px;
+	line-height: 1.5;
+	outline: none;
+	transition: border-color 0.2s;
+}
+
+.rich-text-editor:focus {
+	border-color: #4a90e2;
+}
+
+.rich-text-editor p {
+	margin: 0 0 0.5em 0;
+}
+
+.rich-text-editor p:last-child {
+	margin-bottom: 0;
+}
+
+.rich-text-editor strong {
+	font-weight: bold;
+}
+
+.rich-text-editor em {
+	font-style: italic;
+}
+
+.rich-text-editor code {
+	background-color: #f5f5f5;
+	padding: 2px 4px;
+	border-radius: 3px;
+	font-family: monospace;
+	font-size: 0.9em;
+}
+
+.rich-text-editor [data-placeholder]::before {
+	content: attr(data-placeholder);
+	color: #999;
+	position: absolute;
+	pointer-events: none;
+}
+
+.rich-text-editor.ProseMirror-focused [data-placeholder]::before {
+	display: none;
+}

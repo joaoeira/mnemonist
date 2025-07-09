@@ -1,0 +1,54 @@
+{
+	"name": "mnemonist",
+	"private": true,
+	"version": "1.0.0",
+	"type": "module",
+	"scripts": {
+		"dev": "vite",
+		"build": "tsc && vite build"
+	},
+	"dependencies": {
+		"@biomejs/biome": "2.0.6",
+		"@effect/ai": "^0.21.3",
+		"@effect/ai-anthropic": "^0.11.3",
+		"@effect/ai-openai": "^0.24.3",
+		"@effect/platform-browser": "^0.67.1",
+		"@effect/platform-bun": "^0.72.3",
+		"@effect/platform-node": "^0.88.3",
+		"@react-pdf-viewer/core": "^3.12.0",
+		"@react-pdf-viewer/default-layout": "^3.12.0",
+		"@react-pdf-viewer/highlight": "^3.12.0",
+		"@tanstack/react-query": "^5.81.5",
+		"@tiptap/extension-mathematics": "^2.25.0",
+		"@tiptap/react": "^2.23.0",
+		"@tiptap/starter-kit": "^2.23.0",
+		"@xstate/react": "^6.0.0",
+		"@xstate/store": "^3.8.0",
+		"dexie": "^4.0.11",
+		"dexie-react-hooks": "^1.1.7",
+		"effect": "^3.16.8",
+		"install": "^0.13.0",
+		"katex": "^0.16.22",
+		"npm": "^11.4.2",
+		"pdfjs-dist": "3.4.120",
+		"react": "^18.2.0",
+		"react-dom": "^18.2.0",
+		"tldraw": "^3.13.4",
+		"xstate": "^5.20.0"
+	},
+	"devDependencies": {
+		"@effect/language-service": "^0.23.5",
+		"@tailwindcss/vite": "^4.1.11",
+		"@types/react": "^18.0.26",
+		"@types/react-dom": "^18.0.9",
+		"@types/webextension-polyfill": "^0.10.0",
+		"@vitejs/plugin-react": "^4.2.1",
+		"typescript": "~5.6.3",
+		"vite": "^5.0.0",
+		"vite-plugin-web-extension": "^4.0.0",
+		"webextension-polyfill": "^0.10.0"
+	},
+	"trustedDependencies": [
+		"spawn-sync"
+	]
+}
