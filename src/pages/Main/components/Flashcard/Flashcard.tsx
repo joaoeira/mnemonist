@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Effect } from "effect";
 import type { Flashcard as FlashcardType } from "../../../../domain/flashcard/schema";
 import { FlashcardService } from "../../../../domain/flashcard/service";
-import { Thread } from "../../../../domain/thread/schema";
+import type { Thread } from "../../../../domain/thread/schema";
 import {
   AIService,
   AIServiceComplete,
@@ -35,6 +35,26 @@ function saveFlashcardEffect(flashcard: FlashcardType) {
       front: flashcard.question,
       back: flashcard.answer,
     });
+    return result;
+  });
+
+  return program;
+}
+
+function evaluateFlashcardEffect(question: string, answer: string) {
+  const program = Effect.gen(function* () {
+    const aiService = yield* AIService;
+    const pdfService = yield* PDFService;
+    const file = yield* Effect.sync(() => fileAtom.get());
+    const page = yield* Effect.sync(() => pageAtom.get());
+    if (!file || !page) {
+      return yield* Effect.fail(new Error("No file selected"));
+    }
+    const response = yield* Effect.promise(() => fetch(file.url));
+    const arrayBuffer = yield* Effect.promise(() => response.arrayBuffer());
+    const context = yield* pdfService.getPageContext(arrayBuffer, page);
+
+    const result = yield* aiService.evaluate(question, answer, context);
     return result;
   });
 
@@ -94,6 +114,24 @@ export default function Flashcard({
     },
   });
 
+  const { mutate: evaluateFlashcard } = useMutation({
+    mutationFn: ({ question, answer }: { question: string; answer: string }) =>
+      Effect.runPromise(
+        evaluateFlashcardEffect(question, answer).pipe(
+          Effect.provide(AIServiceComplete),
+          Effect.provide(PDFService.Default)
+        )
+      ),
+    onError: (
+      error: Effect.Effect.Error<ReturnType<typeof evaluateFlashcardEffect>>
+    ) => {
+      console.error(error);
+    },
+    onSuccess: (result) => {
+      console.log(result);
+    },
+  });
+
   return (
     <div className="w-full max-w-2xl mx-2 bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden">
       <div className="p-2 space-y-2">
@@ -135,38 +173,7 @@ export default function Flashcard({
             type="button"
             className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors ml-2"
             onClick={() => {
-              const program = Effect.gen(function* () {
-                const aiService = yield* AIService;
-                const pdfService = yield* PDFService;
-                const file = yield* Effect.sync(() => fileAtom.get());
-                const page = yield* Effect.sync(() => pageAtom.get());
-                if (!file || !page) {
-                  return yield* Effect.fail(new Error("No file selected"));
-                }
-                const response = yield* Effect.promise(() => fetch(file.url));
-                const arrayBuffer = yield* Effect.promise(() =>
-                  response.arrayBuffer()
-                );
-                const context = yield* pdfService.getPageContext(
-                  arrayBuffer,
-                  page
-                );
-
-                const result = yield* aiService.evaluate(
-                  question,
-                  answer,
-                  context
-                );
-                console.log(result);
-              });
-
-              Effect.runPromise(
-                program.pipe(
-                  Effect.catchAll(() => Effect.succeed("error")),
-                  Effect.provide(AIServiceComplete),
-                  Effect.provide(PDFService.Default)
-                )
-              );
+              evaluateFlashcard({ question, answer });
             }}
           >
             Evaluate
