@@ -12,7 +12,7 @@
 }
 
 .rich-text-editor:focus {
-	background-color: color-mix(in srgb, var(--background) 60%, transparent);
+	background-color: color-mix(in srgb, var(--background) 30%, transparent);
 }
 
 .rich-text-editor p {

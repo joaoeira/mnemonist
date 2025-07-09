@@ -19,10 +19,7 @@ const Main = () => {
     return <SelectFile onFileSelected={setDocumentId} />;
   }
 
-  if (!documentId) {
-    console.error("No document id");
-    return null;
-  }
+  if (!documentId) return null;
 
   return (
     <ResizablePanelGroup direction="horizontal" className="h-screen">

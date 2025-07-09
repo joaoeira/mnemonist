@@ -15,6 +15,7 @@ import { PDFService } from "../../../../services/PDFService";
 import { fileAtom } from "../../atoms/fileAtom";
 import { pageAtom } from "../../atoms/pageAtom";
 import RichTextArea from "../FlaschardPanel/components/RichTextArea/RichTextArea";
+import { FlashcardContextMenu } from "./components/FlashcardContextMenu";
 
 function updateFlashcardEffect(
   id: FlashcardType["id"],
@@ -57,6 +58,16 @@ function evaluateFlashcardEffect(question: string, answer: string) {
     const context = yield* pdfService.getPageContext(arrayBuffer, page);
 
     const result = yield* aiService.evaluate(question, answer, context);
+    return result;
+  });
+
+  return program;
+}
+
+function deleteFlashcardEffect(id: FlashcardType["id"]) {
+  const program = Effect.gen(function* () {
+    const flashcardService = yield* FlashcardService;
+    const result = yield* flashcardService.delete(id);
     return result;
   });
 
@@ -134,50 +145,72 @@ export default function Flashcard({
     },
   });
 
-  // lets work theme next,  so that we arent adding bs on top of bs
+  const { mutate: deleteFlashcard } = useMutation({
+    mutationFn: () =>
+      Effect.runPromise(
+        deleteFlashcardEffect(flashcard.id).pipe(
+          Effect.provide(FlashcardService.Default)
+        )
+      ),
+    onError: (
+      error: Effect.Effect.Error<ReturnType<typeof deleteFlashcardEffect>>
+    ) => {
+      console.error(error);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["threadItems", threadId],
+      });
+    },
+  });
 
   return (
-    <Card className="w-full max-w-2xl mx-2 p-0 overflow-hidden">
-      <div>
-        <RichTextArea
-          value={question}
-          onChange={(question) => {
-            updateFlashcard({ question });
-          }}
-          placeholder="Enter your question here..."
-        />
-        <div className="bg-background h-px min-w-full" />
-
-        <RichTextArea
-          value={answer}
-          onChange={(answer) => {
-            updateFlashcard({ answer });
-          }}
-          placeholder="Enter your answer here..."
-        />
-
-        <div className="flex justify-end space-x-2 p-3 border-t border-gray-200">
-          <Button
-            onClick={() => {
-              evaluateFlashcard({ question, answer });
+    <FlashcardContextMenu
+      onDelete={() => deleteFlashcard()}
+      onCreatePermutations={() => console.log("permutations")}
+    >
+      <Card className="w-full max-w-2xl mx-2 p-0 overflow-hidden">
+        <div>
+          <RichTextArea
+            value={question}
+            onChange={(question) => {
+              updateFlashcard({ question });
             }}
-          >
-            Evaluate
-          </Button>
+            placeholder="Enter your question here..."
+          />
+          <div className="bg-background h-px min-w-full" />
 
-          <Button
-            onClick={() => {
-              saveFlashcard(undefined, {
-                onSuccess: (noteId) => {
-                  updateFlashcard({ noteId });
-                },
-              });
+          <RichTextArea
+            value={answer}
+            onChange={(answer) => {
+              updateFlashcard({ answer });
             }}
-          >
-            Add
-          </Button>
+            placeholder="Enter your answer here..."
+          />
+
+          <div className="flex justify-end space-x-2 p-3 border-t border-gray-200">
+            <Button
+              onClick={() => {
+                evaluateFlashcard({ question, answer });
+              }}
+            >
+              Evaluate
+            </Button>
+
+            <Button
+              onClick={() => {
+                saveFlashcard(undefined, {
+                  onSuccess: (noteId) => {
+                    updateFlashcard({ noteId });
+                  },
+                });
+              }}
+            >
+              Add
+            </Button>
+          </div>
         </div>
-      </div>
-    </Card>
+      </Card>
+    </FlashcardContextMenu>
   );
 }
