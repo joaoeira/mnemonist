@@ -4,17 +4,19 @@ import StarterKit from "@tiptap/starter-kit";
 import React from "react";
 import "./RichTextArea.css";
 
-interface RichTextAreaProps {
+type RichTextAreaProps = {
   placeholder?: string;
   value?: string;
   onChange?: (content: string) => void;
+  onSubmit?: (content: string) => void;
   className?: string;
-}
+};
 
 const RichTextArea: React.FC<RichTextAreaProps> = ({
   placeholder = "Start typing...",
   value = "",
   onChange,
+  onSubmit,
   className = "",
 }) => {
   const editor = useEditor({
@@ -38,6 +40,17 @@ const RichTextArea: React.FC<RichTextAreaProps> = ({
     editorProps: {
       attributes: {
         class: `rich-text-editor ${className}`,
+      },
+      handleKeyDown: (_view, event) => {
+        if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+          event.preventDefault();
+          if (onSubmit && editor) {
+            onSubmit(editor.getText());
+            editor.commands.setContent("");
+          }
+          return true;
+        }
+        return false;
       },
     },
   });

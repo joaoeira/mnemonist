@@ -7,6 +7,9 @@ import { MessageService } from "../../../../domain/message/service";
 import type { Thread } from "../../../../domain/thread/schema";
 import { ThreadService } from "../../../../domain/thread/service";
 import Flashcard from "../Flashcard/Flashcard";
+import { AssistantMessageViewer } from "./components/AssistantMessageViewer";
+import { ChatTextArea } from "./components/ChatTextArea";
+import { UserMessageViewer } from "./components/UserMessageViewer";
 
 function getThreadItems(thread: Thread) {
   const program = Effect.gen(function* () {
@@ -165,7 +168,11 @@ export default function ThreadViewer({ thread }: { thread: Thread }) {
         <div className="flex flex-col items-center space-y-4">
           {items.map((item) => {
             if (item._tag === "Message") {
-              return <div key={item.id}>{item.id}</div>;
+              if (item.content._tag === "UserMessage") {
+                return <UserMessageViewer key={item.id} message={item} />;
+              }
+
+              return <AssistantMessageViewer key={item.id} message={item} />;
             }
 
             return (
@@ -187,6 +194,9 @@ export default function ThreadViewer({ thread }: { thread: Thread }) {
             <div className="flex-1 h-px bg-border group-hover:bg-muted-foreground transition-colors duration-200" />
           </div>
         </div>
+      </div>
+      <div className="flex-shrink-0 border-t bg-accent-foreground">
+        <ChatTextArea threadId={thread.id} />
       </div>
       {/* <div className="flex-shrink-0 border-t border-gray-200 bg-white p-4">
         <div className="flex items-center justify-between">
