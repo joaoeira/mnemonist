@@ -1,6 +1,7 @@
 import { FetchHttpClient } from "@effect/platform";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Effect } from "effect";
+import { useReducer } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import type { Flashcard as FlashcardType } from "../../../../domain/flashcard/schema";
@@ -16,6 +17,33 @@ import { fileAtom } from "../../atoms/fileAtom";
 import { pageAtom } from "../../atoms/pageAtom";
 import RichTextArea from "../FlaschardPanel/components/RichTextArea/RichTextArea";
 import { FlashcardContextMenu } from "./components/FlashcardContextMenu";
+import { FlashcardPermutationModal } from "./components/FlashcardPermutationModal";
+
+interface PermutationModalState {
+  isPermutationModalOpen: boolean;
+}
+
+type ModalAction =
+  | { type: "OPEN_PERMUTATION_MODAL" }
+  | { type: "CLOSE_PERMUTATION_MODAL" };
+
+function permutationModalReducer(
+  state: PermutationModalState,
+  action: ModalAction
+): PermutationModalState {
+  switch (action.type) {
+    case "OPEN_PERMUTATION_MODAL":
+      return { ...state, isPermutationModalOpen: true };
+    case "CLOSE_PERMUTATION_MODAL":
+      return { ...state, isPermutationModalOpen: false };
+    default:
+      return state;
+  }
+}
+
+const initialPermutationModalState: PermutationModalState = {
+  isPermutationModalOpen: false,
+};
 
 function updateFlashcardEffect(
   id: FlashcardType["id"],
@@ -87,6 +115,10 @@ export default function Flashcard({
 }) {
   const queryClient = useQueryClient();
   const { question, answer } = flashcard;
+  const [PermutationModalState, permutationModalDispatch] = useReducer(
+    permutationModalReducer,
+    initialPermutationModalState
+  );
 
   const { mutate: updateFlashcard } = useMutation({
     mutationFn: (update: Partial<FlashcardType>) =>
@@ -165,52 +197,65 @@ export default function Flashcard({
   });
 
   return (
-    <FlashcardContextMenu
-      onDelete={() => deleteFlashcard()}
-      onCreatePermutations={() => console.log("permutations")}
-    >
-      <Card className="w-full max-w-2xl mx-2 p-0 overflow-hidden">
-        <div>
-          <RichTextArea
-            value={question}
-            onChange={(question) => {
-              updateFlashcard({ question });
-            }}
-            placeholder="Enter your question here..."
-          />
-          <div className="bg-background h-px min-w-full" />
-
-          <RichTextArea
-            value={answer}
-            onChange={(answer) => {
-              updateFlashcard({ answer });
-            }}
-            placeholder="Enter your answer here..."
-          />
-
-          <div className="flex justify-end space-x-2 p-3 border-t border-gray-200">
-            <Button
-              onClick={() => {
-                evaluateFlashcard({ question, answer });
+    <>
+      <FlashcardContextMenu
+        flashcard={flashcard}
+        onDelete={() => deleteFlashcard()}
+        onCreatePermutations={() =>
+          permutationModalDispatch({ type: "OPEN_PERMUTATION_MODAL" })
+        }
+      >
+        <Card className="w-full max-w-2xl mx-2 p-0 overflow-hidden">
+          <div>
+            <RichTextArea
+              value={question}
+              onChange={(question) => {
+                updateFlashcard({ question });
               }}
-            >
-              Evaluate
-            </Button>
+              placeholder="Enter your question here..."
+            />
+            <div className="bg-background h-px min-w-full" />
 
-            <Button
-              onClick={() => {
-                saveFlashcard(undefined, {
-                  onSuccess: (noteId) => {
-                    updateFlashcard({ noteId });
-                  },
-                });
+            <RichTextArea
+              value={answer}
+              onChange={(answer) => {
+                updateFlashcard({ answer });
               }}
-            >
-              Add
-            </Button>
+              placeholder="Enter your answer here..."
+            />
+
+            <div className="flex justify-end space-x-2 p-3 border-t border-gray-200">
+              <Button
+                onClick={() => {
+                  evaluateFlashcard({ question, answer });
+                }}
+              >
+                Evaluate
+              </Button>
+
+              <Button
+                onClick={() => {
+                  saveFlashcard(undefined, {
+                    onSuccess: (noteId) => {
+                      updateFlashcard({ noteId });
+                    },
+                  });
+                }}
+              >
+                Add
+              </Button>
+            </div>
           </div>
-        </div>
-      </Card>
-    </FlashcardContextMenu>
+        </Card>
+      </FlashcardContextMenu>
+
+      <FlashcardPermutationModal
+        isOpen={PermutationModalState.isPermutationModalOpen}
+        onClose={() =>
+          permutationModalDispatch({ type: "CLOSE_PERMUTATION_MODAL" })
+        }
+        flashcard={flashcard}
+      />
+    </>
   );
 }

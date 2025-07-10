@@ -6,7 +6,7 @@ import type { Message } from "../domain/message/schema";
 import type { Session } from "../domain/session/schema";
 import type { Thread } from "../domain/thread/schema";
 
-const db = new Dexie("FermiReader") as Dexie & {
+const db = new Dexie("Mnemonist") as Dexie & {
 	documents: EntityTable<Document, "id">;
 	threads: EntityTable<Thread, "id">;
 	flashcards: EntityTable<Flashcard, "id">;

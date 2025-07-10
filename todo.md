@@ -1,6 +1,4 @@
-1. Rename things to have Service in the name otherwise becomes though
-2. Create Thread component
-3. Add a message and a flashcard to the thread and render them
+1. save page position
 
 need to clean scratchpad?
 

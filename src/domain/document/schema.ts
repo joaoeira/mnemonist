@@ -21,6 +21,9 @@ export const documentSchema = Schema.TaggedStruct("Document", {
 	createdAt: Schema.DateFromSelf,
 	updatedAt: Schema.DateFromSelf,
 	deletedAt: Schema.optional(Schema.DateFromSelf),
+	lastViewedPage: Schema.optionalWith(Schema.Number, {
+		default: () => 0,
+	}),
 });
 
 export type Document = typeof documentSchema.Type;
