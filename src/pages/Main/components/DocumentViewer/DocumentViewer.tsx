@@ -51,7 +51,7 @@ const updateDocumentLastViewedPageEffect = (
 const DocumentViewer = () => {
   const file = useAtom(fileAtom);
 
-  const { data: document } = useQuery({
+  const { data: document, isLoading } = useQuery({
     queryKey: ["document"],
     queryFn: () =>
       Effect.runPromise(
@@ -108,7 +108,7 @@ const DocumentViewer = () => {
     renderHighlightTarget: renderHighlightTarget,
   });
 
-  if (!file) return null;
+  if (!file || isLoading) return null;
   return (
     <div style={{ height: "100vh", position: "relative" }}>
       <Worker

@@ -1,6 +1,7 @@
 import { AssistantMessage, TextPart, UserMessage } from "@effect/ai/AiInput";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Effect } from "effect";
+import { Plus } from "lucide-react";
 import { FlashcardService } from "../../../../domain/flashcard/service";
 import { MessageService } from "../../../../domain/message/service";
 import type { Thread } from "../../../../domain/thread/schema";
@@ -171,9 +172,23 @@ export default function ThreadViewer({ thread }: { thread: Thread }) {
               <Flashcard key={item.id} flashcard={item} threadId={thread.id} />
             );
           })}
+
+          <div className="relative flex items-center justify-center w-full py-8 group">
+            <div className="flex-1 h-px bg-border group-hover:bg-muted-foreground transition-colors duration-200" />
+            <button
+              type="button"
+              onClick={() => addFlashcard()}
+              className="relative mx-4 w-10 h-10 bg-muted hover:bg-primary/10 border border-border hover:border-primary rounded-full flex items-center justify-center group transition-all duration-200 hover:shadow-md"
+              aria-label="Add flashcard"
+            >
+              <Plus className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors duration-200" />
+            </button>
+
+            <div className="flex-1 h-px bg-border group-hover:bg-muted-foreground transition-colors duration-200" />
+          </div>
         </div>
       </div>
-      <div className="flex-shrink-0 border-t border-gray-200 bg-white p-4">
+      {/* <div className="flex-shrink-0 border-t border-gray-200 bg-white p-4">
         <div className="flex items-center justify-between">
           <button
             type="button"
@@ -242,7 +257,7 @@ export default function ThreadViewer({ thread }: { thread: Thread }) {
             Add user message
           </button>
         </div>
-      </div>
+      </div> */}
     </div>
   );
 }

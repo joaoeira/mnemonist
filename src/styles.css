@@ -54,7 +54,7 @@
 		0px 5px 10px -2px hsl(0 0% 0% / 0.1), 0px 8px 10px -3px hsl(0 0% 0% / 0.1);
 	--shadow-2xl: 0px 5px 10px -2px hsl(0 0% 0% / 0.25);
 	--tracking-normal: 0em;
-	--spacing: 0.17rem;
+	--spacing: 0.2rem;
 }
 
 .dark {

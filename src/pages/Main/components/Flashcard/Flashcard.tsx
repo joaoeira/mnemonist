@@ -1,7 +1,8 @@
 import { FetchHttpClient } from "@effect/platform";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Effect } from "effect";
-import { useReducer } from "react";
+import { Edit } from "lucide-react";
+import { useReducer, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import type { Flashcard as FlashcardType } from "../../../../domain/flashcard/schema";
@@ -18,6 +19,8 @@ import { pageAtom } from "../../atoms/pageAtom";
 import RichTextArea from "../FlaschardPanel/components/RichTextArea/RichTextArea";
 import { FlashcardContextMenu } from "./components/FlashcardContextMenu";
 import { FlashcardPermutationModal } from "./components/FlashcardPermutationModal";
+import { ImproveAnswerModal } from "./components/ImproveAnswerModal";
+import { ImproveQuestionModal } from "./components/ImproveQuestionModal";
 
 interface PermutationModalState {
   isPermutationModalOpen: boolean;
@@ -205,24 +208,33 @@ export default function Flashcard({
           permutationModalDispatch({ type: "OPEN_PERMUTATION_MODAL" })
         }
       >
-        <Card className="w-full max-w-2xl mx-2 p-0 overflow-hidden">
+        <Card className="w-full mx-2 p-0 overflow-hidden">
           <div>
-            <RichTextArea
-              value={question}
-              onChange={(question) => {
-                updateFlashcard({ question });
-              }}
-              placeholder="Enter your question here..."
-            />
+            <div className="relative group">
+              <RichTextArea
+                value={question}
+                onChange={(question) => {
+                  updateFlashcard({ question });
+                }}
+                placeholder="Enter your question here..."
+              />
+              <ImproveQuestionButton
+                flashcard={flashcard}
+                threadId={threadId}
+              />
+            </div>
             <div className="bg-background h-px min-w-full" />
 
-            <RichTextArea
-              value={answer}
-              onChange={(answer) => {
-                updateFlashcard({ answer });
-              }}
-              placeholder="Enter your answer here..."
-            />
+            <div className="relative group">
+              <RichTextArea
+                value={answer}
+                onChange={(answer) => {
+                  updateFlashcard({ answer });
+                }}
+                placeholder="Enter your answer here..."
+              />
+              <ImproveAnswerButton flashcard={flashcard} threadId={threadId} />
+            </div>
 
             <div className="flex justify-end space-x-2 p-3 border-t border-gray-200">
               <Button
@@ -255,6 +267,70 @@ export default function Flashcard({
           permutationModalDispatch({ type: "CLOSE_PERMUTATION_MODAL" })
         }
         flashcard={flashcard}
+      />
+    </>
+  );
+}
+
+function ImproveAnswerButton({
+  flashcard,
+  threadId,
+}: {
+  flashcard: FlashcardType;
+  threadId: Thread["id"];
+}) {
+  const [isImproveAnswerModalOpen, setIsImproveAnswerModalOpen] =
+    useState(false);
+
+  return (
+    <>
+      <Button
+        variant="outline"
+        size="icon"
+        title="Improve answer"
+        disabled={!flashcard.answer.trim()}
+        className="absolute top-3 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+        onPointerDown={() => setIsImproveAnswerModalOpen(true)}
+      >
+        <Edit className="h-4 w-4" />
+      </Button>
+      <ImproveAnswerModal
+        isOpen={isImproveAnswerModalOpen}
+        onClose={() => setIsImproveAnswerModalOpen(false)}
+        flashcard={flashcard}
+        threadId={threadId}
+      />
+    </>
+  );
+}
+
+function ImproveQuestionButton({
+  flashcard,
+  threadId,
+}: {
+  flashcard: FlashcardType;
+  threadId: Thread["id"];
+}) {
+  const [isImproveQuestionModalOpen, setIsImproveQuestionModalOpen] =
+    useState(false);
+
+  return (
+    <>
+      <Button
+        variant="outline"
+        size="icon"
+        title="Improve question"
+        disabled={!flashcard.question.trim()}
+        className="absolute top-3 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+        onPointerDown={() => setIsImproveQuestionModalOpen(true)}
+      >
+        <Edit className="h-4 w-4" />
+      </Button>
+      <ImproveQuestionModal
+        isOpen={isImproveQuestionModalOpen}
+        onClose={() => setIsImproveQuestionModalOpen(false)}
+        flashcard={flashcard}
+        threadId={threadId}
       />
     </>
   );

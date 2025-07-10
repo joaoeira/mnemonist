@@ -18,7 +18,7 @@ const permutationFlashcardSchema = Schema.Struct({
   question: Schema.String,
   answer: Schema.String,
   id: Schema.String,
-  noteId: Schema.optional(Schema.String),
+  noteId: Schema.optional(Schema.Number),
 });
 
 type PermutationFlashcard = typeof permutationFlashcardSchema.Type & {
@@ -40,7 +40,7 @@ type PermutationsAction =
   | { type: "ADD_PERMUTATION"; payload: PermutationFlashcard }
   | { type: "EDIT_QUESTION"; payload: { id: string; question: string } }
   | { type: "EDIT_ANSWER"; payload: { id: string; answer: string } }
-  | { type: "SET_NOTE_ID"; payload: { id: string; noteId: string } };
+  | { type: "SET_NOTE_ID"; payload: { id: string; noteId: number } };
 
 function permutationsReducer(
   state: PermutationsState,
@@ -131,8 +131,8 @@ function createPermutationsEffect(question: string, answer: string) {
 function savePermutationFlashcardEffect(permutation: PermutationFlashcard) {
   const program = Effect.gen(function* () {
     const ankiService = yield* AnkiService;
-    const result = yield* ankiService.addNote({
-      deckName: "Default",
+    const result = yield* ankiService.pushNote({
+      noteId: permutation.noteId,
       front: permutation.question,
       back: permutation.answer,
     });

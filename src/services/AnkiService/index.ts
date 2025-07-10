@@ -58,7 +58,7 @@ export class AnkiService extends Context.Tag("AnkiService")<
 	{
 		readonly isAvailable: () => Effect.Effect<true, AnkiConnectionError, never>;
 		readonly addNote: (args: {
-			deckName: string;
+			deckName?: string;
 			front: string;
 			back: string;
 		}) => Effect.Effect<
@@ -76,6 +76,19 @@ export class AnkiService extends Context.Tag("AnkiService")<
 			back: string;
 		}) => Effect.Effect<
 			null,
+			| AnkiConnectionError
+			| AnkiConnectError
+			| ParseError
+			| RequestError
+			| ResponseError,
+			AnkiService
+		>;
+		readonly pushNote: (args: {
+			noteId?: number;
+			front: string;
+			back: string;
+		}) => Effect.Effect<
+			number,
 			| AnkiConnectionError
 			| AnkiConnectError
 			| ParseError
@@ -140,7 +153,7 @@ export const AnkiServiceLive = Layer.effect(
 						version: ANKI_CONNECT_VERSION,
 						params: {
 							note: {
-								deckName,
+								deckName: deckName ?? "Default",
 								modelName: "Basic",
 								fields: {
 									Front: processedFront,
@@ -216,6 +229,19 @@ export const AnkiServiceLive = Layer.effect(
 					}
 
 					return responseBody.result;
+				}),
+			pushNote: ({ noteId, front, back }) =>
+				Effect.gen(function* () {
+					if (noteId) {
+						yield* (yield* AnkiService).updateNote({
+							noteId,
+							front,
+							back,
+						});
+						return noteId;
+					} else {
+						return yield* (yield* AnkiService).addNote({ front, back });
+					}
 				}),
 			uploadMedia: ({ shapeId, base64Files }) =>
 				Effect.gen(function* () {

@@ -1,0 +1,217 @@
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Effect, Schema } from "effect";
+import { jsonrepair } from "jsonrepair";
+import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { FlashcardService } from "@/domain/flashcard/service";
+import type { Thread } from "@/domain/thread/schema";
+import { fileAtom } from "@/pages/Main/atoms/fileAtom";
+import { pageAtom } from "@/pages/Main/atoms/pageAtom";
+import { AIService, AIServiceComplete } from "@/services/AIService/AIService";
+import { PDFService } from "@/services/PDFService";
+import type { Flashcard } from "../../../../../domain/flashcard/schema";
+
+const improvedQuestionsSchema = Schema.Struct({
+  questions: Schema.Array(Schema.String),
+});
+
+function improveQuestionEffect(question: string, answer: string) {
+  const program = Effect.gen(function* () {
+    const aiService = yield* AIService;
+    const pdfService = yield* PDFService;
+    const file = yield* Effect.sync(() => fileAtom.get());
+    const page = yield* Effect.sync(() => pageAtom.get());
+
+    if (!file) {
+      return yield* Effect.fail(new Error("No file selected"));
+    }
+
+    if (!page) {
+      return yield* Effect.fail(new Error("No page selected"));
+    }
+
+    const response = yield* Effect.promise(() => fetch(file.url));
+    const arrayBuffer = yield* Effect.promise(() => response.arrayBuffer());
+    const context = yield* pdfService.getPageContext(arrayBuffer, page);
+
+    const result = yield* aiService.improveQuestion(question, answer, context);
+
+    const json = yield* Effect.sync(() => JSON.parse(jsonrepair(result)));
+    const improvedQuestions = yield* Schema.decodeUnknown(
+      improvedQuestionsSchema
+    )(json);
+
+    return improvedQuestions.questions.map((q) => `<p>${q}</p>`);
+  });
+
+  return program;
+}
+
+function updateFlashcardEffect(
+  id: Flashcard["id"],
+  flashcard: Partial<Flashcard>
+) {
+  const program = Effect.gen(function* () {
+    const flashcardService = yield* FlashcardService;
+    const result = yield* flashcardService.update(id, flashcard);
+    return result;
+  });
+
+  return program;
+}
+
+interface ImprovedQuestionCardProps {
+  question: string;
+  label?: string;
+  isOriginal?: boolean;
+  onAccept?: () => void;
+}
+
+function ImprovedQuestionCard({
+  question,
+  label,
+  isOriginal = false,
+  onAccept,
+}: ImprovedQuestionCardProps) {
+  return (
+    <Card className={`w-full p-4 ${isOriginal ? "bg-muted/50" : ""}`}>
+      <div className="space-y-2">
+        {label && (
+          <div className="text-sm font-medium text-muted-foreground">
+            {label}
+          </div>
+        )}
+        <div
+          className="text-sm"
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: we store html in the question
+          dangerouslySetInnerHTML={{ __html: question }}
+        />
+        {!isOriginal && onAccept && (
+          <div className="flex justify-end pt-2">
+            <Button size="sm" onClick={onAccept}>
+              Accept
+            </Button>
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+type ImproveQuestionModalProps = {
+  isOpen: boolean;
+  onClose: () => void;
+  flashcard: Flashcard;
+  threadId: Thread["id"];
+};
+
+export function ImproveQuestionModal({
+  isOpen,
+  onClose,
+  flashcard,
+  threadId,
+}: ImproveQuestionModalProps) {
+  const [improvedQuestions, setImprovedQuestions] = useState<string[]>([]);
+  const queryClient = useQueryClient();
+
+  const { mutate: improveQuestion, isPending } = useMutation({
+    mutationFn: ({ question, answer }: { question: string; answer: string }) =>
+      Effect.runPromise(
+        improveQuestionEffect(question, answer).pipe(
+          Effect.provide(AIServiceComplete),
+          Effect.provide(PDFService.Default)
+        )
+      ),
+    retry: 0,
+    onError: (
+      error: Effect.Effect.Error<ReturnType<typeof improveQuestionEffect>>
+    ) => {
+      console.error("Failed to improve question:", error);
+    },
+    onSuccess: (result) => {
+      setImprovedQuestions([...result]);
+    },
+  });
+
+  const { mutate: updateFlashcard } = useMutation({
+    mutationFn: (update: Partial<Flashcard>) =>
+      Effect.runPromise(
+        updateFlashcardEffect(flashcard.id, update).pipe(
+          Effect.provide(FlashcardService.Default)
+        )
+      ),
+    onError: (
+      error: Effect.Effect.Error<ReturnType<typeof updateFlashcardEffect>>
+    ) => {
+      console.error("Failed to update flashcard:", error);
+    },
+    onSuccess: () => {
+      onClose();
+      queryClient.invalidateQueries({
+        queryKey: ["threadItems", threadId],
+      });
+      setImprovedQuestions([]);
+    },
+  });
+
+  useEffect(() => {
+    if (isOpen && improvedQuestions.length === 0) {
+      improveQuestion({
+        question: flashcard.question,
+        answer: flashcard.answer,
+      });
+    }
+  }, [isOpen, flashcard, improveQuestion, improvedQuestions.length]);
+
+  const handleAccept = (question: string) => {
+    updateFlashcard({ question });
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent
+        className="max-w-2xl max-h-[80vh] overflow-y-auto"
+        onInteractOutside={(e) => {
+          e.preventDefault();
+        }}
+      >
+        <DialogHeader>
+          <DialogTitle>Improve Question</DialogTitle>
+        </DialogHeader>
+        <div className="flex flex-col gap-4 w-full">
+          <ImprovedQuestionCard
+            question={flashcard.question}
+            label="Original Question"
+            isOriginal={true}
+          />
+
+          {isPending && (
+            <div className="text-center py-4 text-muted-foreground">
+              Generating improved questions...
+            </div>
+          )}
+          <div className="flex-1 w-full h-px bg-border transition-colors duration-200" />
+
+          {improvedQuestions.length > 0 && (
+            <div className="space-y-3 w-full">
+              {improvedQuestions.map((question) => (
+                <ImprovedQuestionCard
+                  key={question}
+                  question={question}
+                  onAccept={() => handleAccept(question)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
