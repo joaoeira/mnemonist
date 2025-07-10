@@ -57,7 +57,24 @@ const RichTextArea: React.FC<RichTextAreaProps> = ({
 
   React.useEffect(() => {
     if (editor && value !== editor.getHTML()) {
+      // Store current cursor position
+      const { from, to } = editor.state.selection;
+
+      // Update content
       editor.commands.setContent(value);
+
+      // Restore cursor position if it's valid
+      // We need to check if the position is still valid after content change
+      const newDoc = editor.state.doc;
+      const maxPos = newDoc.content.size;
+
+      if (from <= maxPos && to <= maxPos) {
+        // Position is still valid, restore it
+        editor.commands.setTextSelection({ from, to });
+      } else {
+        // Position is invalid, place cursor at the end of the document
+        editor.commands.setTextSelection(maxPos);
+      }
     }
   }, [value, editor]);
 
