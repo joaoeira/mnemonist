@@ -10,6 +10,7 @@ import { fileAtom } from "./atoms/fileAtom";
 import DocumentViewer from "./components/DocumentViewer/DocumentViewer";
 import SelectFile from "./components/SelectFile";
 import SessionManager from "./components/SessionManager/SessionManager";
+import { TopBar } from "./components/TopBar/TopBar";
 
 const Main = () => {
   const [documentId, setDocumentId] = useState<DocumentType["id"] | null>(null);
@@ -22,19 +23,22 @@ const Main = () => {
   if (!documentId) return null;
 
   return (
-    <ResizablePanelGroup direction="horizontal" className="h-screen">
-      <ResizablePanel defaultSize={50} minSize={20}>
-        <DocumentViewer />
-      </ResizablePanel>
-      <ResizableHandle withHandle />
-      <ResizablePanel
-        defaultSize={50}
-        minSize={20}
-        className="h-full overflow-y-auto"
-      >
-        <SessionManager documentId={documentId} />
-      </ResizablePanel>
-    </ResizablePanelGroup>
+    <div className="h-screen flex flex-col">
+      <TopBar documentId={documentId} />
+      <ResizablePanelGroup direction="horizontal" className="flex-1">
+        <ResizablePanel defaultSize={50} minSize={20}>
+          <DocumentViewer />
+        </ResizablePanel>
+        <ResizableHandle withHandle />
+        <ResizablePanel
+          defaultSize={50}
+          minSize={20}
+          className="h-full overflow-y-auto"
+        >
+          <SessionManager documentId={documentId} />
+        </ResizablePanel>
+      </ResizablePanelGroup>
+    </div>
   );
 };
 

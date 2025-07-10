@@ -1,7 +1,7 @@
-import { AssistantMessage, TextPart, UserMessage } from "@effect/ai/AiInput";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Effect } from "effect";
 import { Plus } from "lucide-react";
+import type { Document } from "@/domain/document/schema";
 import { FlashcardService } from "../../../../domain/flashcard/service";
 import { MessageService } from "../../../../domain/message/service";
 import type { Thread } from "../../../../domain/thread/schema";
@@ -49,54 +49,13 @@ function addFlashcardEffect(threadId: Thread["id"]) {
   return program;
 }
 
-function addAssistantMessageEffect(threadId: Thread["id"]) {
-  const program = Effect.gen(function* () {
-    const threadService = yield* ThreadService;
-    const messageService = yield* MessageService;
-
-    yield* threadService.findById(threadId);
-
-    const newAssistantMessage: typeof AssistantMessage.Type =
-      AssistantMessage.make({
-        parts: [TextPart.make({ text: "" })],
-      });
-
-    const message = yield* messageService.create({
-      content: newAssistantMessage,
-    });
-
-    yield* threadService.addItem(threadId, message.id);
-
-    return message;
-  });
-
-  return program;
-}
-
-function addUserMessageEffect(threadId: Thread["id"]) {
-  const program = Effect.gen(function* () {
-    const threadService = yield* ThreadService;
-    const messageService = yield* MessageService;
-
-    yield* threadService.findById(threadId);
-
-    const newUserMessage: typeof UserMessage.Type = UserMessage.make({
-      parts: [TextPart.make({ text: "" })],
-    });
-
-    const message = yield* messageService.create({
-      content: newUserMessage,
-    });
-
-    yield* threadService.addItem(threadId, message.id);
-
-    return message;
-  });
-
-  return program;
-}
-
-export default function ThreadViewer({ thread }: { thread: Thread }) {
+export default function ThreadViewer({
+  thread,
+  documentId,
+}: {
+  thread: Thread;
+  documentId: Document["id"];
+}) {
   const queryClient = useQueryClient();
 
   const { data: items, isLoading } = useQuery({
@@ -114,42 +73,6 @@ export default function ThreadViewer({ thread }: { thread: Thread }) {
       ),
     onError: (
       error: Effect.Effect.Error<ReturnType<typeof addFlashcardEffect>>
-    ) => {
-      console.error(error);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["threadItems", thread.id] });
-    },
-  });
-
-  const { mutate: addAssistantMessage } = useMutation({
-    mutationFn: () =>
-      Effect.runPromise(
-        addAssistantMessageEffect(thread.id).pipe(
-          Effect.provide(ThreadService.Default),
-          Effect.provide(MessageService.Default)
-        )
-      ),
-    onError: (
-      error: Effect.Effect.Error<ReturnType<typeof addAssistantMessageEffect>>
-    ) => {
-      console.error(error);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["threadItems", thread.id] });
-    },
-  });
-
-  const { mutate: addUserMessage } = useMutation({
-    mutationFn: () =>
-      Effect.runPromise(
-        addUserMessageEffect(thread.id).pipe(
-          Effect.provide(ThreadService.Default),
-          Effect.provide(MessageService.Default)
-        )
-      ),
-    onError: (
-      error: Effect.Effect.Error<ReturnType<typeof addUserMessageEffect>>
     ) => {
       console.error(error);
     },
@@ -176,7 +99,12 @@ export default function ThreadViewer({ thread }: { thread: Thread }) {
             }
 
             return (
-              <Flashcard key={item.id} flashcard={item} threadId={thread.id} />
+              <Flashcard
+                key={item.id}
+                flashcard={item}
+                threadId={thread.id}
+                documentId={documentId}
+              />
             );
           })}
 

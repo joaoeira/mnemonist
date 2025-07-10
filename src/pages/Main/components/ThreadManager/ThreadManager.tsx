@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Effect } from "effect";
+import { Document } from "@/domain/document/schema";
 import type { Session as SessionType } from "../../../../domain/session/schema";
 import { SessionService } from "../../../../domain/session/service";
 import { ThreadService } from "../../../../domain/thread/service";
@@ -22,8 +23,10 @@ async function getThreads(sessionId: SessionType["id"]) {
 
 export default function ThreadManager({
   sessionId,
+  documentId,
 }: {
   sessionId: SessionType["id"];
+  documentId: Document["id"];
 }) {
   const { data: threads, isLoading } = useQuery({
     queryKey: ["threads", sessionId],
@@ -38,5 +41,5 @@ export default function ThreadManager({
 
   const firstThread = threads[0];
 
-  return <ThreadViewer thread={firstThread} />;
+  return <ThreadViewer thread={firstThread} documentId={documentId} />;
 }

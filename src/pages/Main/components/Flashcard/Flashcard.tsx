@@ -5,6 +5,8 @@ import { Edit } from "lucide-react";
 import { useReducer, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Document } from "@/domain/document/schema";
+import { DocumentService } from "@/domain/document/service";
 import type { Flashcard as FlashcardType } from "../../../../domain/flashcard/schema";
 import { FlashcardService } from "../../../../domain/flashcard/service";
 import type { Thread } from "../../../../domain/thread/schema";
@@ -21,6 +23,7 @@ import { FlashcardContextMenu } from "./components/FlashcardContextMenu";
 import { FlashcardPermutationModal } from "./components/FlashcardPermutationModal";
 import { ImproveAnswerModal } from "./components/ImproveAnswerModal";
 import { ImproveQuestionModal } from "./components/ImproveQuestionModal";
+import { getFormattedDocumentFlashcardContext } from "./utils/getFormattedDocumentFlashcardContext";
 
 interface PermutationModalState {
   isPermutationModalOpen: boolean;
@@ -61,12 +64,31 @@ function updateFlashcardEffect(
   return program;
 }
 
-function saveFlashcardEffect(flashcard: FlashcardType) {
+function saveFlashcardEffect(
+  flashcard: FlashcardType,
+  documentId: Document["id"]
+) {
   const program = Effect.gen(function* () {
     const ankiService = yield* AnkiService;
+    const documentService = yield* DocumentService;
+    const document = yield* documentService.findById(documentId);
+
+    if (!document) {
+      return yield* Effect.fail(new Error("Document not found"));
+    }
+
+    const title = document.title;
+    if (!title) {
+      return yield* Effect.fail(new Error("Document title not found"));
+    }
+    const year = document.year;
+    const author = document.author;
+
     const result = yield* ankiService.pushNote({
       noteId: flashcard.noteId,
-      front: flashcard.question,
+      front: `${getFormattedDocumentFlashcardContext(title, year, author)}\n\n${
+        flashcard.question
+      }`,
       back: flashcard.answer,
     });
     return result;
@@ -112,9 +134,11 @@ function deleteFlashcardEffect(id: FlashcardType["id"]) {
 export default function Flashcard({
   flashcard,
   threadId,
+  documentId,
 }: {
   flashcard: FlashcardType;
   threadId: Thread["id"];
+  documentId: Document["id"];
 }) {
   const queryClient = useQueryClient();
   const { question, answer } = flashcard;
@@ -145,9 +169,10 @@ export default function Flashcard({
   const { mutate: saveFlashcard } = useMutation({
     mutationFn: () =>
       Effect.runPromise(
-        saveFlashcardEffect(flashcard).pipe(
+        saveFlashcardEffect(flashcard, documentId).pipe(
           Effect.provide(AnkiServiceLive),
-          Effect.provide(FetchHttpClient.layer)
+          Effect.provide(FetchHttpClient.layer),
+          Effect.provide(DocumentService.Default)
         )
       ),
     onError: (

@@ -92,7 +92,9 @@ export default function SessionManager({
   }
 
   if (currentSessionId) {
-    return <ThreadManager sessionId={currentSessionId} />;
+    return (
+      <ThreadManager sessionId={currentSessionId} documentId={documentId} />
+    );
   }
 
   return (
