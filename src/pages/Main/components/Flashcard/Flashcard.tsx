@@ -309,16 +309,18 @@ function ImproveAnswerButton({
 
   return (
     <>
-      <Button
-        variant="outline"
-        size="icon"
-        title="Improve answer"
-        disabled={!flashcard.answer.trim()}
-        className="absolute top-3 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-        onPointerDown={() => setIsImproveAnswerModalOpen(true)}
-      >
-        <Edit className="h-4 w-4" />
-      </Button>
+      {flashcard.answer.trim() && (
+        <Button
+          variant="outline"
+          size="icon"
+          title="Improve answer"
+          disabled={!flashcard.answer.trim()}
+          className="absolute top-3 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+          onPointerDown={() => setIsImproveAnswerModalOpen(true)}
+        >
+          <Edit className="h-4 w-4" />
+        </Button>
+      )}
       <ImproveAnswerModal
         isOpen={isImproveAnswerModalOpen}
         onClose={() => setIsImproveAnswerModalOpen(false)}
@@ -341,16 +343,18 @@ function ImproveQuestionButton({
 
   return (
     <>
-      <Button
-        variant="outline"
-        size="icon"
-        title="Improve question"
-        disabled={!flashcard.question.trim()}
-        className="absolute top-3 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-        onPointerDown={() => setIsImproveQuestionModalOpen(true)}
-      >
-        <Edit className="h-4 w-4" />
-      </Button>
+      {flashcard.question.trim() && (
+        <Button
+          variant="outline"
+          size="icon"
+          title="Improve question"
+          disabled={!flashcard.question.trim()}
+          className="absolute top-3 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+          onPointerDown={() => setIsImproveQuestionModalOpen(true)}
+        >
+          <Edit className="h-4 w-4" />
+        </Button>
+      )}
       <ImproveQuestionModal
         isOpen={isImproveQuestionModalOpen}
         onClose={() => setIsImproveQuestionModalOpen(false)}
