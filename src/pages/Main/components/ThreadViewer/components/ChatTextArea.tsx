@@ -9,7 +9,10 @@ import type { Message } from "@/domain/message/schema";
 import { MessageService } from "@/domain/message/service";
 import type { Thread } from "@/domain/thread/schema";
 import { ThreadService } from "@/domain/thread/service";
+import { fileAtom } from "@/pages/Main/atoms/fileAtom";
+import { pageAtom } from "@/pages/Main/atoms/pageAtom";
 import { AIService, AIServiceComplete } from "@/services/AIService/AIService";
+import { PDFService } from "@/services/PDFService";
 import RichTextArea from "../../FlaschardPanel/components/RichTextArea/RichTextArea";
 
 function addUserMessageEffect(threadId: Thread["id"], content: string) {
@@ -110,7 +113,26 @@ function createContextFromThreadEffect(threadId: Thread["id"]) {
       return match(item);
     });
 
-    return context;
+    const pdfService = yield* PDFService;
+    const file = yield* Effect.sync(() => fileAtom.get());
+    const page = yield* Effect.sync(() => pageAtom.get());
+
+    if (!file || !page) {
+      return yield* Effect.fail(new Error("No file or page selected"));
+    }
+
+    const arrayBuffer = yield* Effect.promise(() => {
+      return fetch(file.url).then((response) => response.arrayBuffer());
+    });
+    const documentContext = UserMessage.make({
+      parts: [
+        TextPart.make({
+          text: yield* pdfService.getPageContext(arrayBuffer, page),
+        }),
+      ],
+    });
+
+    return [documentContext, ...context];
   });
 
   return program;
@@ -232,7 +254,6 @@ export function ChatTextArea({ threadId }: { threadId: Thread["id"] }) {
               },
               onStreamData: (data) => {
                 currentMessage += data.text;
-                console.log(currentMessage, messageIdRef.current);
                 if (messageIdRef.current) {
                   updateAssistantMessage({
                     messageId: messageIdRef.current,
@@ -245,6 +266,7 @@ export function ChatTextArea({ threadId }: { threadId: Thread["id"] }) {
               Effect.provide(ThreadService.Default),
               Effect.provide(MessageService.Default),
               Effect.provide(FlashcardService.Default),
+              Effect.provide(PDFService.Default),
               Effect.runPromise
             );
           },
