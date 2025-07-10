@@ -64,8 +64,8 @@ function updateFlashcardEffect(
 function saveFlashcardEffect(flashcard: FlashcardType) {
   const program = Effect.gen(function* () {
     const ankiService = yield* AnkiService;
-    const result = yield* ankiService.addNote({
-      deckName: "Default",
+    const result = yield* ankiService.pushNote({
+      noteId: flashcard.noteId,
       front: flashcard.question,
       back: flashcard.answer,
     });
