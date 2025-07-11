@@ -7,6 +7,7 @@ import {
 } from "../../components/ui/resizable";
 import type { Document as DocumentType } from "../../domain/document/schema";
 import { fileAtom } from "./atoms/fileAtom";
+import { AnkiNoticeModal } from "./components/AnkiNoticeModal/AnkiNoticeModal";
 import DocumentViewer from "./components/DocumentViewer/DocumentViewer";
 import SelectFile from "./components/SelectFile";
 import SessionManager from "./components/SessionManager/SessionManager";
@@ -17,7 +18,12 @@ const Main = () => {
   const file = useAtom(fileAtom);
 
   if (!file) {
-    return <SelectFile onFileSelected={setDocumentId} />;
+    return (
+      <>
+        <SelectFile onFileSelected={setDocumentId} />
+        <AnkiNoticeModal />
+      </>
+    );
   }
 
   if (!documentId) return null;
@@ -38,6 +44,7 @@ const Main = () => {
           <SessionManager documentId={documentId} />
         </ResizablePanel>
       </ResizablePanelGroup>
+      <AnkiNoticeModal />
     </div>
   );
 };
