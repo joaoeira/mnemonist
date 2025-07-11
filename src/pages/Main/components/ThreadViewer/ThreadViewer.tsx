@@ -3,6 +3,7 @@ import { Effect } from "effect";
 import { Plus } from "lucide-react";
 import type { Document } from "@/domain/document/schema";
 import { FlashcardService } from "../../../../domain/flashcard/service";
+import type { Message } from "../../../../domain/message/schema";
 import { MessageService } from "../../../../domain/message/service";
 import type { Thread } from "../../../../domain/thread/schema";
 import { ThreadService } from "../../../../domain/thread/service";
@@ -49,6 +50,19 @@ function addFlashcardEffect(threadId: Thread["id"]) {
   return program;
 }
 
+function deleteMessageEffect(id: Message["id"], threadId: Thread["id"]) {
+  const program = Effect.gen(function* () {
+    const messageService = yield* MessageService;
+    const threadService = yield* ThreadService;
+
+    yield* threadService.removeItem(threadId, id);
+
+    yield* messageService.delete(id);
+  });
+
+  return program;
+}
+
 export default function ThreadViewer({
   thread,
   documentId,
@@ -81,6 +95,26 @@ export default function ThreadViewer({
     },
   });
 
+  const { mutate: deleteMessage } = useMutation({
+    mutationFn: (messageId: Message["id"]) =>
+      Effect.runPromise(
+        deleteMessageEffect(messageId, thread.id).pipe(
+          Effect.provide(MessageService.Default),
+          Effect.provide(ThreadService.Default)
+        )
+      ),
+    onError: (
+      error: Effect.Effect.Error<ReturnType<typeof deleteMessageEffect>>
+    ) => {
+      console.error(error);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["threadItems", thread.id],
+      });
+    },
+  });
+
   if (isLoading) return <div>Loading...</div>;
 
   if (!items) return <div>Thread not found</div>;
@@ -92,10 +126,22 @@ export default function ThreadViewer({
           {items.map((item) => {
             if (item._tag === "Message") {
               if (item.content._tag === "UserMessage") {
-                return <UserMessageViewer key={item.id} message={item} />;
+                return (
+                  <UserMessageViewer
+                    key={item.id}
+                    message={item}
+                    onDelete={() => deleteMessage(item.id)}
+                  />
+                );
               }
 
-              return <AssistantMessageViewer key={item.id} message={item} />;
+              return (
+                <AssistantMessageViewer
+                  key={item.id}
+                  message={item}
+                  onDelete={() => deleteMessage(item.id)}
+                />
+              );
             }
 
             return (
@@ -126,76 +172,6 @@ export default function ThreadViewer({
       <div className="flex-shrink-0 border-t bg-accent-foreground">
         <ChatTextArea threadId={thread.id} />
       </div>
-      {/* <div className="flex-shrink-0 border-t border-gray-200 bg-white p-4">
-        <div className="flex items-center justify-between">
-          <button
-            type="button"
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 flex items-center gap-2"
-            onClick={() => addFlashcard()}
-          >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              aria-label="Add new item"
-            >
-              <title>Add flashcard</title>
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 4v16m8-8H4"
-              />
-            </svg>
-            Add flashcard
-          </button>
-          <button
-            type="button"
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 flex items-center gap-2"
-            onClick={() => addAssistantMessage()}
-          >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              aria-label="Add new item"
-            >
-              <title>Add assistant message</title>
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 4v16m8-8H4"
-              />
-            </svg>
-            Add assistant message
-          </button>
-          <button
-            type="button"
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 flex items-center gap-2"
-            onClick={() => addUserMessage()}
-          >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              aria-label="Add new item"
-            >
-              <title>Add user message</title>
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 4v16m8-8H4"
-              />
-            </svg>
-            Add user message
-          </button>
-        </div>
-      </div> */}
     </div>
   );
 }
