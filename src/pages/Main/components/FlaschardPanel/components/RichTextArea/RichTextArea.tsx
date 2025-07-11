@@ -3,6 +3,7 @@ import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import React from "react";
 import "./RichTextArea.css";
+import { cn } from "@/lib/utils";
 
 type RichTextAreaProps = {
   placeholder?: string;
@@ -10,6 +11,7 @@ type RichTextAreaProps = {
   onChange?: (content: string) => void;
   onSubmit?: (content: string) => void;
   className?: string;
+  disabled?: boolean;
 };
 
 const RichTextArea: React.FC<RichTextAreaProps> = ({
@@ -18,6 +20,7 @@ const RichTextArea: React.FC<RichTextAreaProps> = ({
   onChange,
   onSubmit,
   className = "",
+  disabled = false,
 }) => {
   const editor = useEditor({
     extensions: [
@@ -33,7 +36,7 @@ const RichTextArea: React.FC<RichTextAreaProps> = ({
     ],
     content: value,
     onUpdate: ({ editor }) => {
-      if (onChange) {
+      if (onChange && !disabled) {
         onChange(editor.getHTML());
       }
     },
@@ -79,8 +82,16 @@ const RichTextArea: React.FC<RichTextAreaProps> = ({
   }, [value, editor]);
 
   return (
-    <div className="rich-text-area">
-      <EditorContent editor={editor} placeholder={placeholder} />
+    <div
+      className={cn("rich-text-area", {
+        "opacity-70": disabled,
+      })}
+    >
+      <EditorContent
+        editor={editor}
+        placeholder={placeholder}
+        disabled={disabled}
+      />
     </div>
   );
 };

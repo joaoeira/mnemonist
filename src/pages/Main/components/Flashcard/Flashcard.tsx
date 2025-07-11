@@ -1,10 +1,16 @@
 import { FetchHttpClient } from "@effect/platform";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Effect } from "effect";
-import { Edit, Loader2, Plus } from "lucide-react";
+import { Edit, Loader2, Plus, RefreshCw } from "lucide-react";
 import { useReducer, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 import type { Document } from "@/domain/document/schema";
 import { DocumentService } from "@/domain/document/service";
 import type { Flashcard as FlashcardType } from "../../../../domain/flashcard/schema";
@@ -263,31 +269,36 @@ export default function Flashcard({
       >
         <Card className="w-full mx-2 p-0 overflow-hidden">
           <div>
-            <div className="relative group">
-              <RichTextArea
-                value={question}
-                onChange={(question) => {
-                  updateFlashcard({ question });
-                }}
-                placeholder="Enter your question here..."
-              />
-              <ImproveQuestionButton
-                flashcard={flashcard}
-                threadId={threadId}
-              />
-            </div>
-            <div className="bg-background h-px min-w-full" />
+            <span>
+              <div className="relative group">
+                <RichTextArea
+                  value={question}
+                  onChange={(question) => {
+                    updateFlashcard({ question });
+                  }}
+                  placeholder="Enter your question here..."
+                />
+                <ImproveQuestionButton
+                  flashcard={flashcard}
+                  threadId={threadId}
+                />
+              </div>
+              <div className="bg-background h-px min-w-full" />
 
-            <div className="relative group">
-              <RichTextArea
-                value={answer}
-                onChange={(answer) => {
-                  updateFlashcard({ answer });
-                }}
-                placeholder="Enter your answer here..."
-              />
-              <ImproveAnswerButton flashcard={flashcard} threadId={threadId} />
-            </div>
+              <div className="relative group">
+                <RichTextArea
+                  value={answer}
+                  onChange={(answer) => {
+                    updateFlashcard({ answer });
+                  }}
+                  placeholder="Enter your answer here..."
+                />
+                <ImproveAnswerButton
+                  flashcard={flashcard}
+                  threadId={threadId}
+                />
+              </div>
+            </span>
             <div className="bg-background h-px min-w-full" />
 
             <AugmentQuoteButton
@@ -427,15 +438,42 @@ function AugmentQuoteButton({
 
   if (flashcard.context) {
     return (
-      <div className="relative group">
-        <RichTextArea
-          value={flashcard.context}
-          onChange={(context) => {
-            updateFlashcard({ context });
-          }}
-          placeholder="Enter your context here..."
-          className="text-xs!"
-        />
+      <div
+        className="relative group"
+        onPointerDown={(e) => {
+          if (e.button === 2) {
+            e.preventDefault();
+          }
+        }}
+      >
+        <ContextMenu>
+          <ContextMenuTrigger asChild>
+            <span>
+              <RichTextArea
+                value={flashcard.context}
+                disabled={isPending}
+                onChange={(context) => {
+                  updateFlashcard({ context });
+                }}
+                placeholder="Enter your context here..."
+                className="text-xs!"
+              />
+            </span>
+          </ContextMenuTrigger>
+          <ContextMenuContent>
+            <ContextMenuItem
+              onClick={() => augmentQuote()}
+              disabled={
+                isPending ||
+                !flashcard.question.trim() ||
+                !flashcard.answer.trim()
+              }
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Retry
+            </ContextMenuItem>
+          </ContextMenuContent>
+        </ContextMenu>
       </div>
     );
   }
