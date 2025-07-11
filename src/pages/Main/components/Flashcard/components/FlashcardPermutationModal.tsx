@@ -6,6 +6,8 @@ import { useEffect, useReducer } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Document } from "@/domain/document/schema";
+import { DocumentService } from "@/domain/document/service";
 import { fileAtom } from "@/pages/Main/atoms/fileAtom";
 import { pageAtom } from "@/pages/Main/atoms/pageAtom";
 import { AIService, AIServiceComplete } from "@/services/AIService/AIService";
@@ -13,6 +15,7 @@ import { AnkiService, AnkiServiceLive } from "@/services/AnkiService";
 import { PDFService } from "@/services/PDFService";
 import type { Flashcard } from "../../../../../domain/flashcard/schema";
 import RichTextArea from "../../FlaschardPanel/components/RichTextArea/RichTextArea";
+import { getFormattedDocumentFlashcardContext } from "../utils/getFormattedDocumentFlashcardContext";
 
 const permutationFlashcardSchema = Schema.Struct({
   question: Schema.String,
@@ -128,12 +131,31 @@ function createPermutationsEffect(question: string, answer: string) {
   return program;
 }
 
-function savePermutationFlashcardEffect(permutation: PermutationFlashcard) {
+function savePermutationFlashcardEffect(
+  permutation: PermutationFlashcard,
+  documentId: Document["id"]
+) {
   const program = Effect.gen(function* () {
     const ankiService = yield* AnkiService;
+    const documentService = yield* DocumentService;
+    const document = yield* documentService.findById(documentId);
+
+    if (!document) {
+      return yield* Effect.fail(new Error("Document not found"));
+    }
+
+    const title = document.title;
+    if (!title) {
+      return yield* Effect.fail(new Error("Document title not found"));
+    }
+    const year = document.year;
+    const author = document.author;
+
     const result = yield* ankiService.pushNote({
       noteId: permutation.noteId,
-      front: permutation.question,
+      front: `${getFormattedDocumentFlashcardContext(title, year, author)}\n\n${
+        permutation.question
+      }`,
       back: permutation.answer,
     });
     return result;
@@ -146,19 +168,22 @@ interface PermutationFlashcardProps {
   permutation: PermutationFlashcard;
   onEditQuestion: (question: string) => void;
   onEditAnswer: (answer: string) => void;
+  documentId: Document["id"];
 }
 
 function PermutationFlashcardComponent({
   permutation,
   onEditQuestion,
   onEditAnswer,
+  documentId,
 }: PermutationFlashcardProps) {
   const { mutate: savePermutationFlashcard } = useMutation({
     mutationFn: () =>
       Effect.runPromise(
-        savePermutationFlashcardEffect(permutation).pipe(
+        savePermutationFlashcardEffect(permutation, documentId).pipe(
           Effect.provide(AnkiServiceLive),
-          Effect.provide(FetchHttpClient.layer)
+          Effect.provide(FetchHttpClient.layer),
+          Effect.provide(DocumentService.Default)
         )
       ),
     onError: (
@@ -199,12 +224,14 @@ type FlashcardPermutationModalProps = {
   isOpen: boolean;
   onClose: () => void;
   flashcard: Flashcard;
+  documentId: Document["id"];
 };
 
 export function FlashcardPermutationModal({
   isOpen,
   onClose,
   flashcard,
+  documentId,
 }: FlashcardPermutationModalProps) {
   const [state, dispatch] = useReducer(
     permutationsReducer,
@@ -259,6 +286,7 @@ export function FlashcardPermutationModal({
             <PermutationFlashcardComponent
               key={permutation.id}
               permutation={permutation}
+              documentId={documentId}
               onEditQuestion={(question) =>
                 dispatch({
                   type: "EDIT_QUESTION",

@@ -5,7 +5,7 @@ import { Edit } from "lucide-react";
 import { useReducer, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Document } from "@/domain/document/schema";
+import type { Document } from "@/domain/document/schema";
 import { DocumentService } from "@/domain/document/service";
 import type { Flashcard as FlashcardType } from "../../../../domain/flashcard/schema";
 import { FlashcardService } from "../../../../domain/flashcard/service";
@@ -292,6 +292,7 @@ export default function Flashcard({
           permutationModalDispatch({ type: "CLOSE_PERMUTATION_MODAL" })
         }
         flashcard={flashcard}
+        documentId={documentId}
       />
     </>
   );
