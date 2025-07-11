@@ -6,8 +6,6 @@ import {
   Dialog,
   DialogContent,
   DialogFooter,
-  DialogHeader,
-  DialogTitle,
 } from "../../../../components/ui/dialog";
 import { Input } from "../../../../components/ui/input";
 import { Label } from "../../../../components/ui/label";
@@ -53,7 +51,7 @@ export function DocumentSettingsModal({
   const [author, setAuthor] = useState("");
   const [year, setYear] = useState("");
 
-  const { data: document } = useQuery({
+  const { data: document, isLoading } = useQuery({
     queryKey: ["document", documentId],
     queryFn: () =>
       Effect.runPromise(
@@ -61,8 +59,12 @@ export function DocumentSettingsModal({
           Effect.provide(DocumentService.Default)
         )
       ),
-    enabled: isOpen,
   });
+
+  const documentHasNoFields =
+    !document?.title && !document?.author && !document?.year;
+
+  const currentValuesEmpty = !title.trim() && !author.trim() && !year.trim();
 
   useEffect(() => {
     if (document) {
@@ -109,12 +111,13 @@ export function DocumentSettingsModal({
     onClose();
   };
 
+  if (isLoading) return null;
+
+  // show the modal always if the document has no fields so the user is forced to fill in the fields
+  // (otherwise will just forget and the cards wont have that context)
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen || documentHasNoFields} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Document Settings</DialogTitle>
-        </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="title" className="text-right">
@@ -155,10 +158,15 @@ export function DocumentSettingsModal({
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={handleCancel}>
-            Cancel
-          </Button>
-          <Button onClick={handleSave} disabled={isPending}>
+          {!documentHasNoFields && (
+            <Button variant="outline" onClick={handleCancel}>
+              Cancel
+            </Button>
+          )}
+          <Button
+            onClick={handleSave}
+            disabled={isPending || (documentHasNoFields && currentValuesEmpty)}
+          >
             Save changes
           </Button>
         </DialogFooter>
