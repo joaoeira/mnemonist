@@ -262,6 +262,14 @@ export function FlashcardPermutationModal({
     },
   });
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: we want to reset the permutations when the flashcard changes
+  useEffect(() => {
+    dispatch({
+      type: "SET_PERMUTATIONS",
+      payload: [],
+    });
+  }, [flashcard.question, flashcard.answer]);
+
   useEffect(() => {
     if (isOpen && state.permutations.length === 0) {
       createPermutations(
