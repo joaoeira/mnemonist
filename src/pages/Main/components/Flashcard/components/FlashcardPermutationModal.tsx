@@ -6,7 +6,7 @@ import { useEffect, useReducer } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { Document } from "@/domain/document/schema";
+import type { Document } from "@/domain/document/schema";
 import { DocumentService } from "@/domain/document/service";
 import { fileAtom } from "@/pages/Main/atoms/fileAtom";
 import { pageAtom } from "@/pages/Main/atoms/pageAtom";
@@ -16,12 +16,14 @@ import { PDFService } from "@/services/PDFService";
 import type { Flashcard } from "../../../../../domain/flashcard/schema";
 import RichTextArea from "../../FlaschardPanel/components/RichTextArea/RichTextArea";
 import { getFormattedDocumentFlashcardContext } from "../utils/getFormattedDocumentFlashcardContext";
+import { getFormattedFlashcardBack } from "../utils/getformattedFlashcardBack";
 
 const permutationFlashcardSchema = Schema.Struct({
   question: Schema.String,
   answer: Schema.String,
   id: Schema.String,
   noteId: Schema.optional(Schema.Number),
+  context: Schema.optional(Schema.String),
 });
 
 type PermutationFlashcard = typeof permutationFlashcardSchema.Type & {
@@ -156,7 +158,7 @@ function savePermutationFlashcardEffect(
       front: `${getFormattedDocumentFlashcardContext(title, year, author)}\n\n${
         permutation.question
       }`,
-      back: permutation.answer,
+      back: getFormattedFlashcardBack(permutation.answer, permutation.context),
     });
     return result;
   });
@@ -253,7 +255,10 @@ export function FlashcardPermutationModal({
       console.error(error);
     },
     onSuccess: (result) => {
-      dispatch({ type: "SET_PERMUTATIONS", payload: result });
+      dispatch({
+        type: "SET_PERMUTATIONS",
+        payload: result.map((p) => ({ ...p, context: flashcard.context })),
+      });
     },
   });
 
