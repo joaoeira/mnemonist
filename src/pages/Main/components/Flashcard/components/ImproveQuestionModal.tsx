@@ -161,6 +161,11 @@ export function ImproveQuestionModal({
     },
   });
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: we want to reset the improved questions when the flashcard question changes
+  useEffect(() => {
+    setImprovedQuestions([]);
+  }, [flashcard.question]);
+
   useEffect(() => {
     if (isOpen && improvedQuestions.length === 0) {
       improveQuestion({
