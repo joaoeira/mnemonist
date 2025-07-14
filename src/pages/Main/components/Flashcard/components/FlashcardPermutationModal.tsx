@@ -1,5 +1,5 @@
 import { FetchHttpClient } from "@effect/platform";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Effect, Schema } from "effect";
 import { jsonrepair } from "jsonrepair";
 import { useEffect, useReducer } from "react";
@@ -8,6 +8,9 @@ import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import type { Document } from "@/domain/document/schema";
 import { DocumentService } from "@/domain/document/service";
+import { FlashcardService } from "@/domain/flashcard/service";
+import type { Thread } from "@/domain/thread/schema";
+import { ThreadService } from "@/domain/thread/service";
 import { fileAtom } from "@/pages/Main/atoms/fileAtom";
 import { pageAtom } from "@/pages/Main/atoms/pageAtom";
 import { AIService, AIServiceComplete } from "@/services/AIService/AIService";
@@ -155,11 +158,38 @@ function savePermutationFlashcardEffect(
 
     const result = yield* ankiService.pushNote({
       noteId: permutation.noteId,
-      front: `${getFormattedDocumentFlashcardContext(title, year, author)}\n\n${
-        permutation.question
-      }`,
+      front: `${getFormattedDocumentFlashcardContext(
+        title,
+        year,
+        author
+      )}\n\n<p>${permutation.question}</p>`,
       back: getFormattedFlashcardBack(permutation.answer, permutation.context),
     });
+    return result;
+  });
+
+  return program;
+}
+
+function addPermutationFlashcardToThreadEffect(
+  permutation: PermutationFlashcard,
+  threadId: Thread["id"]
+) {
+  const program = Effect.gen(function* () {
+    const threadService = yield* ThreadService;
+    const flashcardService = yield* FlashcardService;
+
+    const flashcard = yield* flashcardService.create({
+      question: permutation.question,
+      answer: permutation.answer,
+      context: permutation.context,
+      noteId: undefined,
+    });
+
+    yield* threadService.findById(threadId);
+
+    const result = yield* threadService.addItem(threadId, flashcard.id);
+
     return result;
   });
 
@@ -171,6 +201,7 @@ interface PermutationFlashcardProps {
   onEditQuestion: (question: string) => void;
   onEditAnswer: (answer: string) => void;
   documentId: Document["id"];
+  threadId: Thread["id"];
 }
 
 function PermutationFlashcardComponent({
@@ -178,7 +209,9 @@ function PermutationFlashcardComponent({
   onEditQuestion,
   onEditAnswer,
   documentId,
+  threadId,
 }: PermutationFlashcardProps) {
+  const queryClient = useQueryClient();
   const { mutate: savePermutationFlashcard } = useMutation({
     mutationFn: () =>
       Effect.runPromise(
@@ -200,6 +233,29 @@ function PermutationFlashcardComponent({
     },
   });
 
+  const { mutate: addPermutationFlashcardToThread } = useMutation({
+    mutationFn: () =>
+      Effect.runPromise(
+        addPermutationFlashcardToThreadEffect(permutation, threadId).pipe(
+          Effect.provide(ThreadService.Default),
+          Effect.provide(FlashcardService.Default)
+        )
+      ),
+    onError: (
+      error: Effect.Effect.Error<
+        ReturnType<typeof addPermutationFlashcardToThreadEffect>
+      >
+    ) => {
+      console.error(error);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["threadItems", threadId],
+      });
+      console.log("Permutation flashcard added to thread successfully");
+    },
+  });
+
   return (
     <Card className="w-full p-0 overflow-hidden">
       <div>
@@ -215,7 +271,13 @@ function PermutationFlashcardComponent({
           placeholder="Enter your answer here..."
         />
         <div className="flex justify-end space-x-2 p-3 border-t border-gray-200">
-          <Button onClick={() => savePermutationFlashcard()}>Add</Button>
+          <Button
+            variant="secondary"
+            onClick={() => addPermutationFlashcardToThread()}
+          >
+            Add to thread
+          </Button>
+          <Button onClick={() => savePermutationFlashcard()}>Save</Button>
         </div>
       </div>
     </Card>
@@ -227,6 +289,7 @@ type FlashcardPermutationModalProps = {
   onClose: () => void;
   flashcard: Flashcard;
   documentId: Document["id"];
+  threadId: Thread["id"];
 };
 
 export function FlashcardPermutationModal({
@@ -234,6 +297,7 @@ export function FlashcardPermutationModal({
   onClose,
   flashcard,
   documentId,
+  threadId,
 }: FlashcardPermutationModalProps) {
   const [state, dispatch] = useReducer(
     permutationsReducer,
@@ -300,6 +364,7 @@ export function FlashcardPermutationModal({
               key={permutation.id}
               permutation={permutation}
               documentId={documentId}
+              threadId={threadId}
               onEditQuestion={(question) =>
                 dispatch({
                   type: "EDIT_QUESTION",

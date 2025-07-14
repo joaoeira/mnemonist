@@ -7,12 +7,14 @@ import {
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useAtom } from "@xstate/store/react";
 import { Effect } from "effect";
+import { useState } from "react";
 import browser from "webextension-polyfill";
 import type { Document as DocumentType } from "@/domain/document/schema";
 import { DocumentService } from "@/domain/document/service";
 import { PDFService } from "@/services/PDFService";
 import { fileAtom } from "../../atoms/fileAtom";
 import { pageAtom } from "../../atoms/pageAtom";
+import { FlashcardSuggestedFlashcardModal } from "./components/SuggestedFlashcardsModal/SuggestedFlashcardsModal";
 
 const getDocumentEffect = () => {
   return Effect.gen(function* () {
@@ -48,6 +50,82 @@ const updateDocumentLastViewedPageEffect = (
   });
 };
 
+interface DocumentViewerWithModalProps {
+  document: DocumentType;
+  file: { url: string };
+  onPageChange: (page: number) => void;
+}
+
+const DocumentViewerWithModal = ({
+  document,
+  file,
+  onPageChange,
+}: DocumentViewerWithModalProps) => {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedText, setSelectedText] = useState("");
+
+  const renderHighlightTarget = (props: RenderHighlightTargetProps) => (
+    <div
+      style={{
+        background: "#fff",
+        border: "1px solid #ccc",
+        borderRadius: "4px",
+        display: "flex",
+        position: "absolute",
+        left: `${props.selectionRegion.left}%`,
+        top: `${props.selectionRegion.top + props.selectionRegion.height}%`,
+        transform: "translate(0, 8px)",
+        zIndex: 1000,
+        boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+      }}
+    >
+      <Button
+        onClick={() => {
+          setSelectedText(props.selectedText);
+          setIsModalOpen(true);
+          props.cancel();
+        }}
+      >
+        💡 Suggest Flashcards
+      </Button>
+    </div>
+  );
+
+  const highlightPluginInstance = highlightPlugin({
+    renderHighlightTarget: renderHighlightTarget,
+  });
+
+  const defaultLayoutPluginInstance = defaultLayoutPlugin();
+
+  return (
+    <>
+      <div style={{ height: "100vh", position: "relative" }}>
+        <Worker
+          workerUrl={browser.runtime.getURL(
+            "node_modules/pdfjs-dist/build/pdf.worker.min.js"
+          )}
+        >
+          <Viewer
+            fileUrl={file.url}
+            plugins={[highlightPluginInstance, defaultLayoutPluginInstance]}
+            onPageChange={(event) => {
+              pageAtom.set(event.currentPage);
+              onPageChange(event.currentPage);
+            }}
+            initialPage={document?.lastViewedPage ?? 0}
+          />
+        </Worker>
+      </div>
+      <FlashcardSuggestedFlashcardModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        selection={selectedText}
+        documentId={document.id}
+      />
+    </>
+  );
+};
+
 const DocumentViewer = () => {
   const file = useAtom(fileAtom);
 
@@ -76,59 +154,18 @@ const DocumentViewer = () => {
     },
   });
 
-  const defaultLayoutPluginInstance = defaultLayoutPlugin();
-  const renderHighlightTarget = (props: RenderHighlightTargetProps) => (
-    <div
-      style={{
-        background: "#fff",
-        border: "1px solid #ccc",
-        borderRadius: "4px",
-        display: "flex",
-        position: "absolute",
-        left: `${props.selectionRegion.left}%`,
-        top: `${props.selectionRegion.top + props.selectionRegion.height}%`,
-        transform: "translate(0, 8px)",
-        zIndex: 1000,
-        boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-      }}
-    >
-      <Button
-        onClick={() => {
-          navigator.clipboard.writeText(props.selectedText);
-          alert("Text copied to clipboard!");
-          props.cancel();
-        }}
-      >
-        📄 Copy
-      </Button>
-    </div>
-  );
+  if (!file || isLoading || !document) return null;
 
-  const highlightPluginInstance = highlightPlugin({
-    renderHighlightTarget: renderHighlightTarget,
-  });
-
-  if (!file || isLoading) return null;
   return (
-    <div style={{ height: "100vh", position: "relative" }}>
-      <Worker
-        workerUrl={browser.runtime.getURL(
-          "node_modules/pdfjs-dist/build/pdf.worker.min.js"
-        )}
-      >
-        <Viewer
-          fileUrl={file.url}
-          plugins={[highlightPluginInstance, defaultLayoutPluginInstance]}
-          onPageChange={(event) => {
-            pageAtom.set(event.currentPage);
-            if (document) {
-              updateDocumentLastViewedPage(event.currentPage);
-            }
-          }}
-          initialPage={document?.lastViewedPage ?? 0}
-        />
-      </Worker>
-    </div>
+    <DocumentViewerWithModal
+      document={document}
+      file={file}
+      onPageChange={(page) => {
+        if (document) {
+          updateDocumentLastViewedPage(page);
+        }
+      }}
+    />
   );
 };
 
