@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Effect } from "effect";
 import { Plus } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import type { Document } from "@/domain/document/schema";
 import { FlashcardService } from "../../../../domain/flashcard/service";
 import type { Message } from "../../../../domain/message/schema";
@@ -121,53 +122,57 @@ export default function ThreadViewer({
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex-1 overflow-y-auto px-4 py-4">
-        <div className="flex flex-col items-center space-y-4">
-          {items.map((item) => {
-            if (item._tag === "Message") {
-              if (item.content._tag === "UserMessage") {
+      <div className="flex-1 min-h-0">
+        <ScrollArea className="h-full">
+          <div className="px-4 py-4">
+            <div className="flex flex-col items-center space-y-4">
+              {items.map((item) => {
+                if (item._tag === "Message") {
+                  if (item.content._tag === "UserMessage") {
+                    return (
+                      <UserMessageViewer
+                        key={item.id}
+                        message={item}
+                        onDelete={() => deleteMessage(item.id)}
+                      />
+                    );
+                  }
+
+                  return (
+                    <AssistantMessageViewer
+                      key={item.id}
+                      message={item}
+                      onDelete={() => deleteMessage(item.id)}
+                    />
+                  );
+                }
+
                 return (
-                  <UserMessageViewer
+                  <Flashcard
                     key={item.id}
-                    message={item}
-                    onDelete={() => deleteMessage(item.id)}
+                    flashcard={item}
+                    threadId={thread.id}
+                    documentId={documentId}
                   />
                 );
-              }
+              })}
 
-              return (
-                <AssistantMessageViewer
-                  key={item.id}
-                  message={item}
-                  onDelete={() => deleteMessage(item.id)}
-                />
-              );
-            }
+              <div className="relative flex items-center justify-center w-full py-8 group">
+                <div className="flex-1 h-px bg-border group-hover:bg-muted-foreground transition-colors duration-200" />
+                <button
+                  type="button"
+                  onClick={() => addFlashcard()}
+                  className="relative mx-4 w-10 h-10 bg-muted hover:bg-primary/10 border border-border hover:border-primary rounded-full flex items-center justify-center group transition-all duration-200 hover:shadow-md"
+                  aria-label="Add flashcard"
+                >
+                  <Plus className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors duration-200" />
+                </button>
 
-            return (
-              <Flashcard
-                key={item.id}
-                flashcard={item}
-                threadId={thread.id}
-                documentId={documentId}
-              />
-            );
-          })}
-
-          <div className="relative flex items-center justify-center w-full py-8 group">
-            <div className="flex-1 h-px bg-border group-hover:bg-muted-foreground transition-colors duration-200" />
-            <button
-              type="button"
-              onClick={() => addFlashcard()}
-              className="relative mx-4 w-10 h-10 bg-muted hover:bg-primary/10 border border-border hover:border-primary rounded-full flex items-center justify-center group transition-all duration-200 hover:shadow-md"
-              aria-label="Add flashcard"
-            >
-              <Plus className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors duration-200" />
-            </button>
-
-            <div className="flex-1 h-px bg-border group-hover:bg-muted-foreground transition-colors duration-200" />
+                <div className="flex-1 h-px bg-border group-hover:bg-muted-foreground transition-colors duration-200" />
+              </div>
+            </div>
           </div>
-        </div>
+        </ScrollArea>
       </div>
       <div className="flex-shrink-0 border-t bg-accent-foreground">
         <ChatTextArea threadId={thread.id} />
