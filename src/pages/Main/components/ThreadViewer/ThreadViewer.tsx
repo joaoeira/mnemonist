@@ -14,6 +14,7 @@ import Flashcard from "../Flashcard/Flashcard";
 import { AssistantMessageViewer } from "./components/AssistantMessageViewer";
 import { ChatTextArea } from "./components/ChatTextArea";
 import { MessageContextMenu } from "./components/MessageContextMenu";
+import ThreadActionButton from "./components/ThreadActionButton";
 import { UserMessageViewer } from "./components/UserMessageViewer";
 
 function getThreadItems(thread: Thread) {
@@ -187,6 +188,11 @@ export default function ThreadViewer({
 
   return (
     <div className="flex flex-col h-full">
+      <div className="h-6 shadow w-full bg-chart-4 border-b border-border">
+        <div className="flex items-center justify-end">
+          <ThreadActionButton sessionId={sessionId} threadId={thread.id} />
+        </div>
+      </div>
       <div className="flex-1 min-h-0">
         <ScrollArea className="h-full">
           <div className="px-4 py-4">
