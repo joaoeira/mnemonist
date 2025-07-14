@@ -14,6 +14,7 @@ import {
 import type { Document } from "@/domain/document/schema";
 import { DocumentService } from "@/domain/document/service";
 import type { Session } from "@/domain/session/schema";
+import { ThreadService } from "@/domain/thread/service";
 import type { Flashcard as FlashcardType } from "../../../../domain/flashcard/schema";
 import { FlashcardService } from "../../../../domain/flashcard/service";
 import type { Thread } from "../../../../domain/thread/schema";
@@ -152,10 +153,13 @@ function augmentQuoteEffect(question: string, answer: string) {
   return program;
 }
 
-function deleteFlashcardEffect(id: FlashcardType["id"]) {
+function deleteFlashcardEffect(
+  id: FlashcardType["id"],
+  threadId: Thread["id"]
+) {
   const program = Effect.gen(function* () {
-    const flashcardService = yield* FlashcardService;
-    const result = yield* flashcardService.delete(id);
+    const threadService = yield* ThreadService;
+    const result = yield* threadService.removeItem(threadId, id);
     return result;
   });
 
@@ -245,8 +249,8 @@ export default function Flashcard({
   const { mutate: deleteFlashcard } = useMutation({
     mutationFn: () =>
       Effect.runPromise(
-        deleteFlashcardEffect(flashcard.id).pipe(
-          Effect.provide(FlashcardService.Default)
+        deleteFlashcardEffect(flashcard.id, threadId).pipe(
+          Effect.provide(ThreadService.Default)
         )
       ),
     onError: (

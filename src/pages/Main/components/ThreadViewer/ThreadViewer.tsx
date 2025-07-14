@@ -57,12 +57,9 @@ function addFlashcardEffect(threadId: Thread["id"]) {
 
 function deleteMessageEffect(id: Message["id"], threadId: Thread["id"]) {
   const program = Effect.gen(function* () {
-    const messageService = yield* MessageService;
     const threadService = yield* ThreadService;
 
     yield* threadService.removeItem(threadId, id);
-
-    yield* messageService.delete(id);
   });
 
   return program;
