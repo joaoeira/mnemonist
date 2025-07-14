@@ -3,24 +3,29 @@ import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
+  ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-import type { Message } from "@/domain/message/schema";
 
 interface MessageContextMenuProps {
   children: ReactNode;
   onDelete: () => void;
-  message: Message;
+  onSendToNewThread: () => void;
 }
 
 export function MessageContextMenu({
   children,
   onDelete,
+  onSendToNewThread,
 }: MessageContextMenuProps) {
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
       <ContextMenuContent>
+        <ContextMenuItem onClick={onSendToNewThread}>
+          Send to New Thread
+        </ContextMenuItem>
+        <ContextMenuSeparator />
         <ContextMenuItem onClick={onDelete} variant="destructive">
           Delete
         </ContextMenuItem>

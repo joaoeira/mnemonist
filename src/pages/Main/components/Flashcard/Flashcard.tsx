@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/context-menu";
 import type { Document } from "@/domain/document/schema";
 import { DocumentService } from "@/domain/document/service";
-import { Session } from "@/domain/session/schema";
+import type { Session } from "@/domain/session/schema";
 import type { Flashcard as FlashcardType } from "../../../../domain/flashcard/schema";
 import { FlashcardService } from "../../../../domain/flashcard/service";
 import type { Thread } from "../../../../domain/thread/schema";

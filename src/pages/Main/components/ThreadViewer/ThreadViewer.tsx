@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Effect } from "effect";
+import { Array as Arr, Effect, Option } from "effect";
 import { Plus } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { Document } from "@/domain/document/schema";
-import { Session } from "@/domain/session/schema";
+import type { Session } from "@/domain/session/schema";
+import { SessionService } from "@/domain/session/service";
 import { FlashcardService } from "../../../../domain/flashcard/service";
 import type { Message } from "../../../../domain/message/schema";
 import { MessageService } from "../../../../domain/message/service";
@@ -12,6 +13,7 @@ import { ThreadService } from "../../../../domain/thread/service";
 import Flashcard from "../Flashcard/Flashcard";
 import { AssistantMessageViewer } from "./components/AssistantMessageViewer";
 import { ChatTextArea } from "./components/ChatTextArea";
+import { MessageContextMenu } from "./components/MessageContextMenu";
 import { UserMessageViewer } from "./components/UserMessageViewer";
 
 function getThreadItems(thread: Thread) {
@@ -63,6 +65,46 @@ function deleteMessageEffect(id: Message["id"], threadId: Thread["id"]) {
   });
 
   return program;
+}
+
+function sendMessageToNewThreadEffect(
+  message: Message,
+  threadId: Thread["id"],
+  sessionId: Session["id"]
+) {
+  const program = Effect.gen(function* () {
+    const threadService = yield* ThreadService;
+    const sessionService = yield* SessionService;
+
+    const thread = yield* threadService.create({
+      items: [message.id],
+      visible: true,
+    });
+
+    const sessionThreads = yield* sessionService
+      .getThreads(sessionId)
+      .pipe(Effect.map((threads) => threads.map((t) => t.id)));
+
+    const threadIndex = Arr.findFirstIndex(
+      sessionThreads,
+      (id) => id === threadId
+    ).pipe(Option.getOrThrow);
+
+    const newThreadIds = Arr.insertAt(
+      sessionThreads,
+      threadIndex + 1,
+      thread.id
+    ).pipe(Option.getOrThrow);
+
+    yield* sessionService.update(sessionId, { threads: newThreadIds });
+
+    return thread;
+  });
+
+  return program.pipe(
+    Effect.provide(ThreadService.Default),
+    Effect.provide(SessionService.Default)
+  );
 }
 
 export default function ThreadViewer({
@@ -119,6 +161,26 @@ export default function ThreadViewer({
     },
   });
 
+  const { mutate: sendMessageToNewThread } = useMutation({
+    mutationFn: (message: Message) =>
+      Effect.runPromise(
+        sendMessageToNewThreadEffect(message, thread.id, sessionId)
+      ),
+    onSuccess: (newThread) => {
+      queryClient.invalidateQueries({ queryKey: ["threads", sessionId] });
+      setTimeout(
+        () =>
+          document
+            .querySelector(`[data-thread-id="${newThread.id}"]`)
+            ?.scrollIntoView({
+              behavior: "smooth",
+              block: "center",
+            }),
+        100
+      );
+    },
+  });
+
   if (isLoading) return <div>Loading...</div>;
 
   if (!items) return <div>Thread not found</div>;
@@ -133,20 +195,24 @@ export default function ThreadViewer({
                 if (item._tag === "Message") {
                   if (item.content._tag === "UserMessage") {
                     return (
-                      <UserMessageViewer
-                        key={item.id}
-                        message={item}
+                      <MessageContextMenu
                         onDelete={() => deleteMessage(item.id)}
-                      />
+                        onSendToNewThread={() => sendMessageToNewThread(item)}
+                        key={item.id}
+                      >
+                        <UserMessageViewer key={item.id} message={item} />
+                      </MessageContextMenu>
                     );
                   }
 
                   return (
-                    <AssistantMessageViewer
+                    <MessageContextMenu
                       key={item.id}
-                      message={item}
                       onDelete={() => deleteMessage(item.id)}
-                    />
+                      onSendToNewThread={() => sendMessageToNewThread(item)}
+                    >
+                      <AssistantMessageViewer key={item.id} message={item} />
+                    </MessageContextMenu>
                   );
                 }
 
