@@ -3,6 +3,7 @@ import { Effect } from "effect";
 import { Plus } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { Document } from "@/domain/document/schema";
+import { Session } from "@/domain/session/schema";
 import { FlashcardService } from "../../../../domain/flashcard/service";
 import type { Message } from "../../../../domain/message/schema";
 import { MessageService } from "../../../../domain/message/service";
@@ -67,9 +68,11 @@ function deleteMessageEffect(id: Message["id"], threadId: Thread["id"]) {
 export default function ThreadViewer({
   thread,
   documentId,
+  sessionId,
 }: {
   thread: Thread;
   documentId: Document["id"];
+  sessionId: Session["id"];
 }) {
   const queryClient = useQueryClient();
 
@@ -153,6 +156,7 @@ export default function ThreadViewer({
                     flashcard={item}
                     threadId={thread.id}
                     documentId={documentId}
+                    sessionId={sessionId}
                   />
                 );
               })}

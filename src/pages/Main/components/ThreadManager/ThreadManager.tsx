@@ -121,7 +121,11 @@ function ThreadViewerContainer({
       className="flex-1 min-w-xl h-full border-r border-border last:border-r-0 relative"
       data-thread-id={thread.id}
     >
-      <ThreadViewer thread={thread} documentId={documentId} />
+      <ThreadViewer
+        thread={thread}
+        documentId={documentId}
+        sessionId={sessionId}
+      />
       {!isLastThread && (
         <div
           className={`absolute opacity-0 hover:opacity-100 top-0 right-0 h-full w-8 z-10 flex items-center justify-center transition-opacity duration-200`}

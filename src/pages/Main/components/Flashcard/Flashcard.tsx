@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/context-menu";
 import type { Document } from "@/domain/document/schema";
 import { DocumentService } from "@/domain/document/service";
+import { Session } from "@/domain/session/schema";
 import type { Flashcard as FlashcardType } from "../../../../domain/flashcard/schema";
 import { FlashcardService } from "../../../../domain/flashcard/service";
 import type { Thread } from "../../../../domain/thread/schema";
@@ -169,10 +170,12 @@ export default function Flashcard({
   flashcard,
   threadId,
   documentId,
+  sessionId,
 }: {
   flashcard: FlashcardType;
   threadId: Thread["id"];
   documentId: Document["id"];
+  sessionId: Session["id"];
 }) {
   const queryClient = useQueryClient();
   const { question, answer } = flashcard;
@@ -262,6 +265,8 @@ export default function Flashcard({
     <>
       <FlashcardContextMenu
         flashcard={flashcard}
+        sessionId={sessionId}
+        threadId={threadId}
         onDelete={() => deleteFlashcard()}
         onCreatePermutations={() =>
           permutationModalDispatch({ type: "OPEN_PERMUTATION_MODAL" })
