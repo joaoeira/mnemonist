@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAtom } from "@xstate/store/react";
 import { Array as Arr, Effect, Option } from "effect";
 import { Plus } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import type { Document } from "@/domain/document/schema";
 import type { Session } from "@/domain/session/schema";
 import { SessionService } from "@/domain/session/service";
 import { FlashcardService } from "../../../../domain/flashcard/service";
@@ -10,6 +10,7 @@ import type { Message } from "../../../../domain/message/schema";
 import { MessageService } from "../../../../domain/message/service";
 import type { Thread } from "../../../../domain/thread/schema";
 import { ThreadService } from "../../../../domain/thread/service";
+import { sessionIdAtom } from "../../atoms/sessionIdAtom";
 import Flashcard from "../Flashcard/Flashcard";
 import { AssistantMessageViewer } from "./components/AssistantMessageViewer";
 import { ChatTextArea } from "./components/ChatTextArea";
@@ -105,20 +106,16 @@ function sendMessageToNewThreadEffect(
   );
 }
 
-export default function ThreadViewer({
-  thread,
-  documentId,
-  sessionId,
-}: {
-  thread: Thread;
-  documentId: Document["id"];
-  sessionId: Session["id"];
-}) {
+export default function ThreadViewer({ thread }: { thread: Thread }) {
+  const sessionId = useAtom(sessionIdAtom);
   const queryClient = useQueryClient();
 
   const { data: items, isLoading } = useQuery({
     queryKey: ["threadItems", thread.id],
-    queryFn: () => getThreadItems(thread),
+    queryFn: () => {
+      if (!sessionId) return Promise.reject(new Error("Session ID not found"));
+      return getThreadItems(thread);
+    },
   });
 
   const { mutate: addFlashcard } = useMutation({
@@ -160,10 +157,12 @@ export default function ThreadViewer({
   });
 
   const { mutate: sendMessageToNewThread } = useMutation({
-    mutationFn: (message: Message) =>
-      Effect.runPromise(
+    mutationFn: (message: Message) => {
+      if (!sessionId) return Promise.reject(new Error("Session ID not found"));
+      return Effect.runPromise(
         sendMessageToNewThreadEffect(message, thread.id, sessionId)
-      ),
+      );
+    },
     onSuccess: (newThread) => {
       queryClient.invalidateQueries({ queryKey: ["threads", sessionId] });
       setTimeout(
@@ -187,7 +186,7 @@ export default function ThreadViewer({
     <div className="flex flex-col h-full">
       <div className="h-6 shadow w-full bg-chart-4 border-b border-border">
         <div className="flex items-center justify-end">
-          <ThreadActionButton sessionId={sessionId} threadId={thread.id} />
+          <ThreadActionButton threadId={thread.id} />
         </div>
       </div>
       <div className="flex-1 min-h-0">
@@ -224,8 +223,6 @@ export default function ThreadViewer({
                     key={item.id}
                     flashcard={item}
                     threadId={thread.id}
-                    documentId={documentId}
-                    sessionId={sessionId}
                   />
                 );
               })}

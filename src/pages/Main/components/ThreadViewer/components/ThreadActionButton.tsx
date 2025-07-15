@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAtom } from "@xstate/store/react";
 import { Array as Arr, Effect, Option, pipe } from "effect";
 import { ArrowLeft, ArrowRight, Ellipsis, Trash } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,6 +13,7 @@ import type { Session } from "@/domain/session/schema";
 import { SessionService } from "@/domain/session/service";
 import type { Thread } from "@/domain/thread/schema";
 import { ThreadService } from "@/domain/thread/service";
+import { sessionIdAtom } from "../../../atoms/sessionIdAtom";
 
 async function getThreadPosition(
   sessionId: Session["id"],
@@ -105,32 +107,40 @@ function moveThreadEffect(
 }
 
 type ThreadActionButtonProps = {
-  sessionId: Session["id"];
   threadId: Thread["id"];
 };
 
 export default function ThreadActionButton({
-  sessionId,
   threadId,
 }: ThreadActionButtonProps) {
+  const sessionId = useAtom(sessionIdAtom);
   const queryClient = useQueryClient();
 
   const { data: threadPosition } = useQuery({
     queryKey: ["thread-position", sessionId, threadId],
-    queryFn: () => getThreadPosition(sessionId, threadId),
+    queryFn: () => {
+      if (!sessionId) return Promise.reject(new Error("Session ID not found"));
+      return getThreadPosition(sessionId, threadId);
+    },
   });
 
   const { mutate: deleteThread } = useMutation({
-    mutationFn: () =>
-      Effect.runPromise(deleteThreadEffect(threadId, sessionId)),
+    mutationFn: () => {
+      if (!sessionId) return Promise.reject(new Error("Session ID not found"));
+      return Effect.runPromise(deleteThreadEffect(threadId, sessionId));
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["threads", sessionId] });
     },
   });
 
   const { mutate: moveThread } = useMutation({
-    mutationFn: (direction: "left" | "right") =>
-      Effect.runPromise(moveThreadEffect(threadId, sessionId, direction)),
+    mutationFn: (direction: "left" | "right") => {
+      if (!sessionId) return Promise.reject(new Error("Session ID not found"));
+      return Effect.runPromise(
+        moveThreadEffect(threadId, sessionId, direction)
+      );
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["threads", sessionId] });
       queryClient.invalidateQueries({

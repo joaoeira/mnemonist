@@ -1,11 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAtom } from "@xstate/store/react";
 import { Array as Arr, Effect, Option } from "effect";
 import { Plus } from "lucide-react";
-import type { Document } from "@/domain/document/schema";
 import type { Thread } from "@/domain/thread/schema";
 import type { Session as SessionType } from "../../../../domain/session/schema";
 import { SessionService } from "../../../../domain/session/service";
 import { ThreadService } from "../../../../domain/thread/service";
+import { sessionIdAtom } from "../../atoms/sessionIdAtom";
 import ThreadViewer from "../ThreadViewer/ThreadViewer";
 
 async function getThreads(sessionId: SessionType["id"]) {
@@ -89,18 +90,19 @@ async function addThreadAfter(
 
 function ThreadViewerContainer({
   thread,
-  documentId,
   isLastThread,
-  sessionId,
 }: {
   thread: Thread;
-  documentId: Document["id"];
   isLastThread: boolean;
-  sessionId: SessionType["id"];
 }) {
+  const sessionId = useAtom(sessionIdAtom);
   const queryClient = useQueryClient();
+
   const { mutate: addThreadAfterMutation } = useMutation({
-    mutationFn: () => addThreadAfter(sessionId, thread.id),
+    mutationFn: () => {
+      if (!sessionId) return Promise.reject(new Error("Session ID not found"));
+      return addThreadAfter(sessionId, thread.id);
+    },
     onSuccess: (newThread) => {
       queryClient.invalidateQueries({ queryKey: ["threads", sessionId] });
       setTimeout(
@@ -121,11 +123,7 @@ function ThreadViewerContainer({
       className="flex-1 min-w-xl h-full border-r border-border last:border-r-0 relative"
       data-thread-id={thread.id}
     >
-      <ThreadViewer
-        thread={thread}
-        documentId={documentId}
-        sessionId={sessionId}
-      />
+      <ThreadViewer thread={thread} />
       {!isLastThread && (
         <div
           className={`absolute opacity-0 hover:opacity-100 top-0 right-0 h-full w-8 z-10 flex items-center justify-center transition-opacity duration-200`}
@@ -145,21 +143,23 @@ function ThreadViewerContainer({
   );
 }
 
-export default function ThreadManager({
-  sessionId,
-  documentId,
-}: {
-  sessionId: SessionType["id"];
-  documentId: Document["id"];
-}) {
+export default function ThreadManager() {
+  const sessionId = useAtom(sessionIdAtom);
   const queryClient = useQueryClient();
+
   const { data: threads, isLoading } = useQuery({
     queryKey: ["threads", sessionId],
-    queryFn: () => getThreads(sessionId),
+    queryFn: () => {
+      if (!sessionId) return Promise.reject(new Error("Session ID not found"));
+      return getThreads(sessionId);
+    },
   });
 
   const { mutate: addThreadMutation } = useMutation({
-    mutationFn: () => addThread(sessionId),
+    mutationFn: () => {
+      if (!sessionId) return Promise.reject(new Error("Session ID not found"));
+      return addThread(sessionId);
+    },
     onSuccess: (newThread) => {
       queryClient.invalidateQueries({ queryKey: ["threads", sessionId] });
       setTimeout(
@@ -189,8 +189,6 @@ export default function ThreadManager({
         <ThreadViewerContainer
           key={thread.id}
           thread={thread}
-          sessionId={sessionId}
-          documentId={documentId}
           isLastThread={index === threads.length - 1}
         />
       ))}

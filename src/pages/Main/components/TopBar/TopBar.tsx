@@ -1,15 +1,15 @@
+import { useAtom } from "@xstate/store/react";
 import { Settings } from "lucide-react";
 import { useState } from "react";
 import { Button } from "../../../../components/ui/button";
-import type { Document as DocumentType } from "../../../../domain/document/schema";
+import { documentIdAtom } from "../../atoms/documentIdAtom";
 import { DocumentSettingsModal } from "./DocumentSettingsModal";
 
-interface TopBarProps {
-  documentId: DocumentType["id"];
-}
-
-export function TopBar({ documentId }: TopBarProps) {
+export function TopBar() {
+  const documentId = useAtom(documentIdAtom);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+
+  if (!documentId) return null;
 
   return (
     <>
@@ -32,7 +32,6 @@ export function TopBar({ documentId }: TopBarProps) {
       <DocumentSettingsModal
         isOpen={isSettingsModalOpen}
         onClose={() => setIsSettingsModalOpen(false)}
-        documentId={documentId}
       />
     </>
   );

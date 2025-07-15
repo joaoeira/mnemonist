@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAtom } from "@xstate/store/react";
 import { Array as Arr, Effect, Option } from "effect";
 import type { ReactNode } from "react";
 import {
@@ -13,13 +14,13 @@ import { SessionService } from "@/domain/session/service";
 import type { Thread } from "@/domain/thread/schema";
 import { ThreadService } from "@/domain/thread/service";
 import type { Flashcard } from "../../../../../domain/flashcard/schema";
+import { sessionIdAtom } from "../../../atoms/sessionIdAtom";
 
 interface FlashcardContextMenuProps {
   children: ReactNode;
   onDelete: () => void;
   onCreatePermutations: () => void;
   flashcard: Flashcard;
-  sessionId: Session["id"];
   threadId: Thread["id"];
 }
 
@@ -68,15 +69,18 @@ export function FlashcardContextMenu({
   onDelete,
   onCreatePermutations,
   flashcard,
-  sessionId,
   threadId,
 }: FlashcardContextMenuProps) {
+  const sessionId = useAtom(sessionIdAtom);
   const queryClient = useQueryClient();
+
   const { mutate: sendFlashcardToNewThread } = useMutation({
-    mutationFn: () =>
-      Effect.runPromise(
+    mutationFn: () => {
+      if (!sessionId) return Promise.reject(new Error("Session ID not found"));
+      return Effect.runPromise(
         sendFlashcardToNewThreadEffect(flashcard, threadId, sessionId)
-      ),
+      );
+    },
     onSuccess: (newThread) => {
       queryClient.invalidateQueries({ queryKey: ["threads", sessionId] });
       setTimeout(

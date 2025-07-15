@@ -1,5 +1,6 @@
 import { FetchHttpClient } from "@effect/platform";
 import { useMutation } from "@tanstack/react-query";
+import { useAtom } from "@xstate/store/react";
 import { Effect, Schema } from "effect";
 import { jsonrepair } from "jsonrepair";
 import { useEffect, useReducer } from "react";
@@ -8,15 +9,10 @@ import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import type { Document } from "@/domain/document/schema";
 import { DocumentService } from "@/domain/document/service";
+import { documentIdAtom } from "@/pages/Main/atoms/documentIdAtom";
 import { fileAtom } from "@/pages/Main/atoms/fileAtom";
 import { pageAtom } from "@/pages/Main/atoms/pageAtom";
-import type { Flashcard } from "@/schemas/flashcardSchema";
-import {
-  AIService,
-  AIServiceComplete,
-  AIServiceReasoning,
-  o3,
-} from "@/services/AIService/AIService";
+import { AIService, AIServiceReasoning } from "@/services/AIService/AIService";
 import { AnkiService, AnkiServiceLive } from "@/services/AnkiService";
 import { PDFService } from "@/services/PDFService";
 import RichTextArea from "../../../FlaschardPanel/components/RichTextArea/RichTextArea";
@@ -181,24 +177,27 @@ interface SuggestedFlashcardProps {
   suggestedFlashcard: SuggestedFlashcard;
   onEditQuestion: (question: string) => void;
   onEditAnswer: (answer: string) => void;
-  documentId: Document["id"];
 }
 
 function SuggestedFlashcardComponent({
   suggestedFlashcard,
   onEditQuestion,
   onEditAnswer,
-  documentId,
 }: SuggestedFlashcardProps) {
+  const documentId = useAtom(documentIdAtom);
   const { mutate: saveSuggestedFlashcard } = useMutation({
-    mutationFn: () =>
-      Effect.runPromise(
+    mutationFn: () => {
+      if (!documentId) {
+        return Promise.reject(new Error("Document ID not found"));
+      }
+      return Effect.runPromise(
         saveSuggestedFlashcardEffect(suggestedFlashcard, documentId).pipe(
           Effect.provide(AnkiServiceLive),
           Effect.provide(FetchHttpClient.layer),
           Effect.provide(DocumentService.Default)
         )
-      ),
+      );
+    },
     onError: (
       error: Effect.Effect.Error<
         ReturnType<typeof saveSuggestedFlashcardEffect>
@@ -237,14 +236,12 @@ type FlashcardSuggestedFlashcardModalProps = {
   isOpen: boolean;
   onClose: () => void;
   selection: string;
-  documentId: Document["id"];
 };
 
 export function FlashcardSuggestedFlashcardModal({
   isOpen,
   onClose,
   selection,
-  documentId,
 }: FlashcardSuggestedFlashcardModalProps) {
   const [state, dispatch] = useReducer(
     suggestedFlashcardsReducer,
@@ -320,7 +317,6 @@ export function FlashcardSuggestedFlashcardModal({
             <SuggestedFlashcardComponent
               key={suggestedFlashcard.id}
               suggestedFlashcard={suggestedFlashcard}
-              documentId={documentId}
               onEditQuestion={(question) =>
                 dispatch({
                   type: "EDIT_QUESTION",

@@ -1,11 +1,11 @@
 import { useAtom } from "@xstate/store/react";
-import { useState } from "react";
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
 } from "../../components/ui/resizable";
 import type { Document as DocumentType } from "../../domain/document/schema";
+import { documentIdAtom } from "./atoms/documentIdAtom";
 import { fileAtom } from "./atoms/fileAtom";
 import { AnkiNoticeModal } from "./components/AnkiNoticeModal/AnkiNoticeModal";
 import DocumentViewer from "./components/DocumentViewer/DocumentViewer";
@@ -14,13 +14,17 @@ import SessionManager from "./components/SessionManager/SessionManager";
 import { TopBar } from "./components/TopBar/TopBar";
 
 const Main = () => {
-  const [documentId, setDocumentId] = useState<DocumentType["id"] | null>(null);
+  const documentId = useAtom(documentIdAtom);
   const file = useAtom(fileAtom);
+
+  const handleFileSelected = (docId: DocumentType["id"]) => {
+    documentIdAtom.set(docId);
+  };
 
   if (!file) {
     return (
       <>
-        <SelectFile onFileSelected={setDocumentId} />
+        <SelectFile onFileSelected={handleFileSelected} />
         <AnkiNoticeModal />
       </>
     );
@@ -30,7 +34,7 @@ const Main = () => {
 
   return (
     <div className="h-screen flex flex-col">
-      <TopBar documentId={documentId} />
+      <TopBar />
       <ResizablePanelGroup direction="horizontal" className="flex-1">
         <ResizablePanel defaultSize={50} minSize={20}>
           <DocumentViewer />
@@ -41,7 +45,7 @@ const Main = () => {
           minSize={20}
           className="h-full overflow-y-auto"
         >
-          <SessionManager documentId={documentId} />
+          <SessionManager />
         </ResizablePanel>
       </ResizablePanelGroup>
       <AnkiNoticeModal />

@@ -120,7 +120,6 @@ const DocumentViewerWithModal = ({
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         selection={selectedText}
-        documentId={document.id}
       />
     </>
   );

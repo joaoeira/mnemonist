@@ -1,11 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAtom } from "@xstate/store/react";
 import { Array as Arr, Effect, Order } from "effect";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import type { Document as DocumentType } from "../../../../domain/document/schema";
 import { DocumentService } from "../../../../domain/document/service";
 import type { Session as SessionType } from "../../../../domain/session/schema";
 import { SessionService } from "../../../../domain/session/service";
 import { ThreadService } from "../../../../domain/thread/service";
+import { documentIdAtom } from "../../atoms/documentIdAtom";
+import { sessionIdAtom } from "../../atoms/sessionIdAtom";
 import ThreadManager from "../ThreadManager/ThreadManager";
 
 async function getSessions(documentId: DocumentType["id"]) {
@@ -41,19 +44,18 @@ function createSessionEffect(documentId: DocumentType["id"]) {
   return program;
 }
 
-export default function SessionManager({
-  documentId,
-}: {
-  documentId: DocumentType["id"];
-}) {
-  const [currentSessionId, setCurrentSessionId] = useState<
-    SessionType["id"] | null
-  >(null);
+export default function SessionManager() {
+  const documentId = useAtom(documentIdAtom);
+  const currentSessionId = useAtom(sessionIdAtom);
   const queryClient = useQueryClient();
 
   const { data: sessions, isLoading } = useQuery({
     queryKey: ["sessions", documentId],
-    queryFn: () => getSessions(documentId),
+    queryFn: () => {
+      if (!documentId)
+        return Promise.reject(new Error("Document ID not found"));
+      return getSessions(documentId);
+    },
   });
 
   const sortedSessions = useMemo(() => {
@@ -64,17 +66,20 @@ export default function SessionManager({
   }, [sessions]);
 
   const { mutate: createSession, isPending: isCreating } = useMutation({
-    mutationFn: () =>
-      Effect.runPromise(
+    mutationFn: () => {
+      if (!documentId)
+        return Promise.reject(new Error("Document ID not found"));
+      return Effect.runPromise(
         createSessionEffect(documentId).pipe(
           Effect.provide(SessionService.Default),
           Effect.provide(DocumentService.Default),
           Effect.provide(ThreadService.Default)
         )
-      ),
+      );
+    },
     onSuccess: (session) => {
       queryClient.invalidateQueries({ queryKey: ["sessions", documentId] });
-      setCurrentSessionId(session.id);
+      sessionIdAtom.set(session.id);
     },
     onError: (
       error: Effect.Effect.Error<ReturnType<typeof createSessionEffect>>
@@ -92,9 +97,7 @@ export default function SessionManager({
   }
 
   if (currentSessionId) {
-    return (
-      <ThreadManager sessionId={currentSessionId} documentId={documentId} />
-    );
+    return <ThreadManager />;
   }
 
   return (
@@ -148,7 +151,7 @@ export default function SessionManager({
             <div
               key={session.id}
               className="p-4 bg-white border border-gray-200 rounded-lg hover:shadow-md transition-shadow duration-200 cursor-pointer"
-              onPointerDown={() => setCurrentSessionId(session.id)}
+              onPointerDown={() => sessionIdAtom.set(session.id)}
             >
               <div className="flex items-center justify-between">
                 <div className="flex-1">

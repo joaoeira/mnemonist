@@ -1,5 +1,6 @@
 import { FetchHttpClient } from "@effect/platform";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAtom } from "@xstate/store/react";
 import { Effect, Schema } from "effect";
 import { jsonrepair } from "jsonrepair";
 import { useEffect, useReducer } from "react";
@@ -11,6 +12,7 @@ import { DocumentService } from "@/domain/document/service";
 import { FlashcardService } from "@/domain/flashcard/service";
 import type { Thread } from "@/domain/thread/schema";
 import { ThreadService } from "@/domain/thread/service";
+import { documentIdAtom } from "@/pages/Main/atoms/documentIdAtom";
 import { fileAtom } from "@/pages/Main/atoms/fileAtom";
 import { pageAtom } from "@/pages/Main/atoms/pageAtom";
 import { AIService, AIServiceComplete } from "@/services/AIService/AIService";
@@ -200,7 +202,6 @@ interface PermutationFlashcardProps {
   permutation: PermutationFlashcard;
   onEditQuestion: (question: string) => void;
   onEditAnswer: (answer: string) => void;
-  documentId: Document["id"];
   threadId: Thread["id"];
 }
 
@@ -208,19 +209,23 @@ function PermutationFlashcardComponent({
   permutation,
   onEditQuestion,
   onEditAnswer,
-  documentId,
   threadId,
 }: PermutationFlashcardProps) {
+  const documentId = useAtom(documentIdAtom);
   const queryClient = useQueryClient();
+
   const { mutate: savePermutationFlashcard } = useMutation({
-    mutationFn: () =>
-      Effect.runPromise(
+    mutationFn: () => {
+      if (!documentId)
+        return Promise.reject(new Error("Document ID not found"));
+      return Effect.runPromise(
         savePermutationFlashcardEffect(permutation, documentId).pipe(
           Effect.provide(AnkiServiceLive),
           Effect.provide(FetchHttpClient.layer),
           Effect.provide(DocumentService.Default)
         )
-      ),
+      );
+    },
     onError: (
       error: Effect.Effect.Error<
         ReturnType<typeof savePermutationFlashcardEffect>
@@ -288,7 +293,6 @@ type FlashcardPermutationModalProps = {
   isOpen: boolean;
   onClose: () => void;
   flashcard: Flashcard;
-  documentId: Document["id"];
   threadId: Thread["id"];
 };
 
@@ -296,7 +300,6 @@ export function FlashcardPermutationModal({
   isOpen,
   onClose,
   flashcard,
-  documentId,
   threadId,
 }: FlashcardPermutationModalProps) {
   const [state, dispatch] = useReducer(
@@ -363,7 +366,6 @@ export function FlashcardPermutationModal({
             <PermutationFlashcardComponent
               key={permutation.id}
               permutation={permutation}
-              documentId={documentId}
               threadId={threadId}
               onEditQuestion={(question) =>
                 dispatch({

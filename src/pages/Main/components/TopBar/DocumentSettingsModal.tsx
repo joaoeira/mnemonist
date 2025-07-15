@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAtom } from "@xstate/store/react";
 import { Effect } from "effect";
 import { useEffect, useState } from "react";
 import { Button } from "../../../../components/ui/button";
@@ -11,11 +12,11 @@ import { Input } from "../../../../components/ui/input";
 import { Label } from "../../../../components/ui/label";
 import type { Document as DocumentType } from "../../../../domain/document/schema";
 import { DocumentService } from "../../../../domain/document/service";
+import { documentIdAtom } from "../../atoms/documentIdAtom";
 
 interface DocumentSettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  documentId: DocumentType["id"];
 }
 
 function getDocumentEffect(documentId: DocumentType["id"]) {
@@ -44,8 +45,8 @@ function updateDocumentEffect(
 export function DocumentSettingsModal({
   isOpen,
   onClose,
-  documentId,
 }: DocumentSettingsModalProps) {
+  const documentId = useAtom(documentIdAtom);
   const queryClient = useQueryClient();
   const [title, setTitle] = useState("");
   const [author, setAuthor] = useState("");
@@ -53,34 +54,27 @@ export function DocumentSettingsModal({
 
   const { data: document, isLoading } = useQuery({
     queryKey: ["document", documentId],
-    queryFn: () =>
-      Effect.runPromise(
+    queryFn: () => {
+      if (!documentId)
+        return Promise.reject(new Error("Document ID not found"));
+      return Effect.runPromise(
         getDocumentEffect(documentId).pipe(
           Effect.provide(DocumentService.Default)
         )
-      ),
+      );
+    },
   });
 
-  const documentHasNoFields =
-    !document?.title && !document?.author && !document?.year;
-
-  const currentValuesEmpty = !title.trim() && !author.trim() && !year.trim();
-
-  useEffect(() => {
-    if (document) {
-      setTitle(document.title || "");
-      setAuthor(document.author || "");
-      setYear(document.year?.toString() || "");
-    }
-  }, [document]);
-
   const { mutate: updateDocument, isPending } = useMutation({
-    mutationFn: (updates: Partial<DocumentType>) =>
-      Effect.runPromise(
+    mutationFn: (updates: Partial<DocumentType>) => {
+      if (!documentId)
+        return Promise.reject(new Error("Document ID not found"));
+      return Effect.runPromise(
         updateDocumentEffect(documentId, updates).pipe(
           Effect.provide(DocumentService.Default)
         )
-      ),
+      );
+    },
     onError: (
       error: Effect.Effect.Error<ReturnType<typeof updateDocumentEffect>>
     ) => {
@@ -92,6 +86,19 @@ export function DocumentSettingsModal({
       onClose();
     },
   });
+
+  useEffect(() => {
+    if (document) {
+      setTitle(document.title || "");
+      setAuthor(document.author || "");
+      setYear(document.year?.toString() || "");
+    }
+  }, [document]);
+
+  const documentHasNoFields =
+    !document?.title && !document?.author && !document?.year;
+
+  const currentValuesEmpty = !title.trim() && !author.trim() && !year.trim();
 
   const handleSave = () => {
     const updates: Partial<DocumentType> = {

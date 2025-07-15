@@ -1,5 +1,6 @@
 import { FetchHttpClient } from "@effect/platform";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAtom } from "@xstate/store/react";
 import { Effect } from "effect";
 import { Edit, Loader2, Plus, RefreshCw } from "lucide-react";
 import { useReducer, useState } from "react";
@@ -13,7 +14,6 @@ import {
 } from "@/components/ui/context-menu";
 import type { Document } from "@/domain/document/schema";
 import { DocumentService } from "@/domain/document/service";
-import type { Session } from "@/domain/session/schema";
 import { ThreadService } from "@/domain/thread/service";
 import type { Flashcard as FlashcardType } from "../../../../domain/flashcard/schema";
 import { FlashcardService } from "../../../../domain/flashcard/service";
@@ -24,8 +24,10 @@ import {
 } from "../../../../services/AIService/AIService";
 import { AnkiService, AnkiServiceLive } from "../../../../services/AnkiService";
 import { PDFService } from "../../../../services/PDFService";
+import { documentIdAtom } from "../../atoms/documentIdAtom";
 import { fileAtom } from "../../atoms/fileAtom";
 import { pageAtom } from "../../atoms/pageAtom";
+import { sessionIdAtom } from "../../atoms/sessionIdAtom";
 import RichTextArea from "../FlaschardPanel/components/RichTextArea/RichTextArea";
 import { FlashcardContextMenu } from "./components/FlashcardContextMenu";
 import { FlashcardPermutationModal } from "./components/FlashcardPermutationModal";
@@ -173,14 +175,12 @@ function deleteFlashcardEffect(
 export default function Flashcard({
   flashcard,
   threadId,
-  documentId,
-  sessionId,
 }: {
   flashcard: FlashcardType;
   threadId: Thread["id"];
-  documentId: Document["id"];
-  sessionId: Session["id"];
 }) {
+  const documentId = useAtom(documentIdAtom);
+  const sessionId = useAtom(sessionIdAtom);
   const queryClient = useQueryClient();
   const { question, answer } = flashcard;
   const [PermutationModalState, permutationModalDispatch] = useReducer(
@@ -208,14 +208,17 @@ export default function Flashcard({
   });
 
   const { mutate: saveFlashcard } = useMutation({
-    mutationFn: () =>
-      Effect.runPromise(
+    mutationFn: () => {
+      if (!documentId)
+        return Promise.reject(new Error("Document ID not found"));
+      return Effect.runPromise(
         saveFlashcardEffect(flashcard, documentId).pipe(
           Effect.provide(AnkiServiceLive),
           Effect.provide(FetchHttpClient.layer),
           Effect.provide(DocumentService.Default)
         )
-      ),
+      );
+    },
     onError: (
       error: Effect.Effect.Error<ReturnType<typeof saveFlashcardEffect>>
     ) => {
@@ -265,11 +268,12 @@ export default function Flashcard({
     },
   });
 
+  if (!documentId || !sessionId) return null;
+
   return (
     <>
       <FlashcardContextMenu
         flashcard={flashcard}
-        sessionId={sessionId}
         threadId={threadId}
         onDelete={() => deleteFlashcard()}
         onCreatePermutations={() =>
@@ -346,7 +350,6 @@ export default function Flashcard({
           permutationModalDispatch({ type: "CLOSE_PERMUTATION_MODAL" })
         }
         flashcard={flashcard}
-        documentId={documentId}
         threadId={threadId}
       />
     </>
