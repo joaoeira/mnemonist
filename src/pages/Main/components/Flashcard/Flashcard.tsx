@@ -1,9 +1,9 @@
 import { FetchHttpClient } from "@effect/platform";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAtom } from "@xstate/store/react";
 import { Effect } from "effect";
 import { Edit, Loader2, Plus, RefreshCw } from "lucide-react";
-import { useReducer, useState } from "react";
+import { useEffect, useReducer, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -22,7 +22,11 @@ import {
   AIService,
   AIServiceComplete,
 } from "../../../../services/AIService/AIService";
-import { AnkiService, AnkiServiceLive } from "../../../../services/AnkiService";
+import {
+  AnkiService,
+  AnkiServiceLive,
+  hasNoteByNoteIdParams,
+} from "../../../../services/AnkiService";
 import { PDFService } from "../../../../services/PDFService";
 import { documentIdAtom } from "../../atoms/documentIdAtom";
 import { fileAtom } from "../../atoms/fileAtom";
@@ -168,6 +172,21 @@ function deleteFlashcardEffect(
   return program;
 }
 
+function hasNoteEffect(noteId: number) {
+  const program = Effect.gen(function* () {
+    const ankiService = yield* AnkiService;
+    const result = yield* ankiService.hasNote(
+      hasNoteByNoteIdParams.make({ noteId })
+    );
+    return result;
+  });
+
+  return program.pipe(
+    Effect.provide(AnkiServiceLive),
+    Effect.provide(FetchHttpClient.layer)
+  );
+}
+
 // TODO: this is going to be hell with rerenders bc its invalidating the thread
 
 // I think we should just go with the ids, then have a component do a race on the find, then use that to switch what gets rendered (??)
@@ -183,6 +202,16 @@ export default function Flashcard({
   const sessionId = useAtom(sessionIdAtom);
   const queryClient = useQueryClient();
   const { question, answer } = flashcard;
+
+  const { data: hasNote, isFetched: hasNoteFetched } = useQuery({
+    queryKey: ["hasNote", flashcard.noteId],
+    queryFn: () => {
+      if (!flashcard.noteId) return Promise.resolve(false);
+      return Effect.runPromise(hasNoteEffect(flashcard.noteId));
+    },
+    enabled: !!flashcard.noteId,
+  });
+
   const [PermutationModalState, permutationModalDispatch] = useReducer(
     permutationModalReducer,
     initialPermutationModalState
@@ -268,6 +297,13 @@ export default function Flashcard({
     },
   });
 
+  // if the user has deleted the note in Anki, clear the noteId
+  useEffect(() => {
+    if (flashcard.noteId && !hasNote && hasNoteFetched) {
+      updateFlashcard({ noteId: undefined });
+    }
+  }, [hasNote, updateFlashcard, flashcard.noteId, hasNoteFetched]);
+
   if (!documentId || !sessionId) return null;
 
   return (
@@ -337,7 +373,7 @@ export default function Flashcard({
                   });
                 }}
               >
-                Add
+                {hasNote ? "Update" : "Add"}
               </Button>
             </div>
           </div>

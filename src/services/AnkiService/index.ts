@@ -47,10 +47,35 @@ const convertMathExpressions = (text: string): string => {
 	return text.replace(/\$([^$]+)\$/g, "<anki-mathjax>$1</anki-mathjax>");
 };
 
-export const hasNoteParams = Schema.TaggedStruct("ByContent", {
+export const hasNoteByContentParams = Schema.TaggedStruct("ByContent", {
 	deckName: Schema.String,
 	front: Schema.String,
 	back: Schema.String,
+});
+
+export const hasNoteByNoteIdParams = Schema.TaggedStruct("ByNoteId", {
+	noteId: Schema.Number,
+});
+
+export const notesInfoResponseSchema = Schema.Struct({
+	result: Schema.Array(
+		Schema.Struct({
+			noteId: Schema.Number,
+			profile: Schema.String,
+			modelName: Schema.String,
+			tags: Schema.Array(Schema.String),
+			fields: Schema.Record({
+				key: Schema.String,
+				value: Schema.Struct({
+					value: Schema.String,
+					order: Schema.Number,
+				}),
+			}),
+			mod: Schema.Number,
+			cards: Schema.Array(Schema.Number),
+		}),
+	),
+	error: Schema.NullOr(Schema.String),
 });
 
 export class AnkiService extends Context.Tag("AnkiService")<
@@ -109,7 +134,9 @@ export class AnkiService extends Context.Tag("AnkiService")<
 			AnkiService
 		>;
 		readonly hasNote: (
-			params: typeof hasNoteParams.Type,
+			params:
+				| typeof hasNoteByContentParams.Type
+				| typeof hasNoteByNoteIdParams.Type,
 		) => Effect.Effect<
 			boolean,
 			| AnkiConnectionError
@@ -129,18 +156,14 @@ export const AnkiServiceLive = Layer.effect(
 
 		return AnkiService.of({
 			isAvailable: () =>
-				Effect.gen(function* () {
-					return yield* client
-						.execute(HttpClientRequest.get(ANKI_CONNECT_URL))
-						.pipe(
-							Effect.andThen(() => Effect.succeed(true as const)),
-							Effect.catchAll(() =>
-								Effect.fail(
-									new AnkiConnectionError({ message: "Anki is not available" }),
-								),
-							),
-						);
-				}),
+				client.execute(HttpClientRequest.get(ANKI_CONNECT_URL)).pipe(
+					Effect.andThen(() => Effect.succeed(true as const)),
+					Effect.catchAll(() =>
+						Effect.fail(
+							new AnkiConnectionError({ message: "Anki is not available" }),
+						),
+					),
+				),
 			addNote: ({ deckName, front, back }) =>
 				Effect.gen(function* () {
 					yield* (yield* AnkiService).isAvailable();
@@ -280,7 +303,11 @@ export const AnkiServiceLive = Layer.effect(
 
 					return yield* Effect.all(uploadPromises);
 				}),
-			hasNote: (params) =>
+			hasNote: (
+				params:
+					| typeof hasNoteByContentParams.Type
+					| typeof hasNoteByNoteIdParams.Type,
+			) =>
 				Effect.gen(function* () {
 					yield* (yield* AnkiService).isAvailable();
 
@@ -325,6 +352,35 @@ export const AnkiServiceLive = Layer.effect(
 								}
 
 								return !responseBody.result[0];
+							}),
+						),
+						Match.when({ _tag: "ByNoteId" }, ({ noteId }) =>
+							Effect.gen(function* () {
+								const requestBody = {
+									action: "notesInfo",
+									version: ANKI_CONNECT_VERSION,
+									params: {
+										notes: [noteId],
+									},
+								};
+
+								const response = yield* client.execute(
+									HttpClientRequest.post(ANKI_CONNECT_URL).pipe(
+										HttpClientRequest.bodyUnsafeJson(requestBody),
+									),
+								);
+
+								const responseBody = yield* HttpClientResponse.schemaBodyJson(
+									notesInfoResponseSchema,
+								)(response);
+
+								if (responseBody.error) {
+									return yield* new AnkiConnectionError({
+										message: responseBody.error,
+									});
+								}
+
+								return responseBody.result.length > 0;
 							}),
 						),
 						Match.exhaustive,
