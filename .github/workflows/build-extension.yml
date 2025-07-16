@@ -1,0 +1,119 @@
+name: Build Extension
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+    inputs:
+      create_release:
+        description: 'Create a release after build'
+        required: false
+        default: 'false'
+        type: boolean
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v2
+      with:
+        bun-version: latest
+
+    - name: Install dependencies
+      run: bun install --frozen-lockfile
+
+    - name: Build extension
+      run: bun run build
+
+    - name: Get package version
+      id: package-version
+      run: |
+        VERSION=$(bun -p "require('./package.json').version")
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+    - name: Create extension archive
+      run: |
+        cd dist
+        zip -r ../mnemonist-extension-v${{ steps.package-version.outputs.version }}.zip .
+        cd ..
+
+    - name: Upload build artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: mnemonist-extension-v${{ steps.package-version.outputs.version }}
+        path: |
+          dist/
+          mnemonist-extension-v${{ steps.package-version.outputs.version }}.zip
+        retention-days: 90
+
+    - name: Upload extension zip
+      uses: actions/upload-artifact@v4
+      with:
+        name: mnemonist-extension-zip-v${{ steps.package-version.outputs.version }}
+        path: mnemonist-extension-v${{ steps.package-version.outputs.version }}.zip
+        retention-days: 90
+
+  create-release:
+    if: github.event.inputs.create_release == 'true' && github.ref == 'refs/heads/master'
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v2
+      with:
+        bun-version: latest
+
+    - name: Get package version
+      id: package-version
+      run: |
+        VERSION=$(bun -p "require('./package.json').version")
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+    - name: Download artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: mnemonist-extension-zip-v${{ steps.package-version.outputs.version }}
+
+    - name: Create Release
+      uses: actions/create-release@v1
+      id: create_release
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: v${{ steps.package-version.outputs.version }}
+        release_name: Mnemonist Extension v${{ steps.package-version.outputs.version }}
+        body: |
+          ## Mnemonist Extension v${{ steps.package-version.outputs.version }}
+
+          ### Installation Instructions
+          1. Download the `mnemonist-extension-v${{ steps.package-version.outputs.version }}.zip` file
+          2. Extract the zip file
+          3. Open Chrome and navigate to `chrome://extensions/`
+          4. Enable "Developer mode" in the top right
+          5. Click "Load unpacked" and select the extracted folder
+
+          ### Changes
+          - Automated build from commit ${{ github.sha }}
+        draft: false
+        prerelease: false
+
+    - name: Upload Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./mnemonist-extension-v${{ steps.package-version.outputs.version }}.zip
+        asset_name: mnemonist-extension-v${{ steps.package-version.outputs.version }}.zip
+        asset_content_type: application/zip
