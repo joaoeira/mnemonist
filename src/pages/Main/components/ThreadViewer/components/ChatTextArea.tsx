@@ -1,4 +1,5 @@
 import type { AiResponse } from "@effect/ai";
+import { AiError } from "@effect/ai/AiError";
 import { AssistantMessage, TextPart, UserMessage } from "@effect/ai/AiInput";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Effect, Match, Schema, Stream } from "effect";
@@ -11,7 +12,11 @@ import type { Thread } from "@/domain/thread/schema";
 import { ThreadService } from "@/domain/thread/service";
 import { fileAtom } from "@/pages/Main/atoms/fileAtom";
 import { pageAtom } from "@/pages/Main/atoms/pageAtom";
-import { AIService, AIServiceReasoning } from "@/services/AIService/AIService";
+import {
+  AIService,
+  AIServiceReasoning,
+  FlashcardTools,
+} from "@/services/AIService/AIService";
 import { PDFService } from "@/services/PDFService";
 import RichTextArea from "../../FlaschardPanel/components/RichTextArea/RichTextArea";
 
@@ -162,7 +167,43 @@ function replyEffect(
     );
   });
 
-  return program;
+  return program.pipe(
+    Effect.provide(AIServiceReasoning),
+    Effect.provide(ThreadService.Default),
+    Effect.provide(MessageService.Default),
+    Effect.provide(FlashcardService.Default),
+    Effect.provide(PDFService.Default)
+  );
+}
+
+function addFlashcardsToThreadEffect(
+  threadId: Thread["id"],
+  flashcards: readonly {
+    readonly question: string;
+    readonly answer: string;
+  }[]
+) {
+  const program = Effect.gen(function* () {
+    const threadService = yield* ThreadService;
+    const flashcardService = yield* FlashcardService;
+
+    yield* Effect.all(
+      flashcards.map((flashcard) =>
+        Effect.gen(function* () {
+          const newFlashcard = yield* flashcardService.create({
+            question: flashcard.question,
+            answer: flashcard.answer,
+          });
+          yield* threadService.addItem(threadId, newFlashcard.id);
+        })
+      )
+    );
+  });
+
+  return program.pipe(
+    Effect.provide(FlashcardService.Default),
+    Effect.provide(ThreadService.Default)
+  );
 }
 
 export function ChatTextArea({ threadId }: { threadId: Thread["id"] }) {
@@ -262,11 +303,25 @@ export function ChatTextArea({ threadId }: { threadId: Thread["id"] }) {
                 }
               },
             }).pipe(
-              Effect.provide(AIServiceReasoning),
-              Effect.provide(ThreadService.Default),
-              Effect.provide(MessageService.Default),
-              Effect.provide(FlashcardService.Default),
-              Effect.provide(PDFService.Default),
+              Effect.provide(
+                FlashcardTools.toLayer({
+                  "create-flashcard": ({ flashcards }) => {
+                    return addFlashcardsToThreadEffect(
+                      threadId,
+                      flashcards
+                    ).pipe(
+                      Effect.mapError((e) => {
+                        return AiError.make({
+                          cause: e,
+                          module: "AIService",
+                          method: "create-flashcard",
+                          description: `Failed to create flashcards: ${e.message}`,
+                        });
+                      })
+                    );
+                  },
+                })
+              ),
               Effect.runPromise
             );
           },

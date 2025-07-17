@@ -1,10 +1,11 @@
-import { type AiError, AiLanguageModel } from "@effect/ai";
+import { type AiError, AiLanguageModel, AiTool, AiToolkit } from "@effect/ai";
 import {
 	type AssistantMessage,
 	TextPart,
 	UserMessage,
 } from "@effect/ai/AiInput";
 import type { AiResponse } from "@effect/ai/AiResponse";
+import type { Handler } from "@effect/ai/AiTool";
 import { OpenAiClient, OpenAiLanguageModel } from "@effect/ai-openai";
 import { FetchHttpClient } from "@effect/platform";
 import {
@@ -16,6 +17,7 @@ import {
 	Layer,
 	Redacted,
 	Schedule,
+	Schema,
 	type Stream,
 } from "effect";
 import {
@@ -72,6 +74,24 @@ function getDocumentInformation() {
 
 export const gpt41 = OpenAiLanguageModel.model("gpt-4.1");
 export const o3 = OpenAiLanguageModel.model("o3");
+
+const CreateFlashcard = AiTool.make("create-flashcard", {
+	description:
+		"Create a flashcard based on the selected text and user instruction",
+	success: Schema.Void,
+	failure: Schema.Never,
+	parameters: {
+		flashcards: Schema.Array(
+			Schema.Struct({
+				question: Schema.String,
+				answer: Schema.String,
+			}),
+		),
+	},
+});
+
+export class FlashcardTools extends AiToolkit.make(CreateFlashcard) {}
+
 export class AIService extends Context.Tag("AIService")<
 	AIService,
 	{
@@ -102,7 +122,7 @@ export class AIService extends Context.Tag("AIService")<
 		) => Effect.Effect<
 			string,
 			ConfigError.ConfigError | AiError.AiError | DocumentServiceErrors,
-			never
+			Effect.Effect.Context<typeof FlashcardTools>
 		>;
 		improveQuestion: (
 			question: string,
@@ -125,7 +145,11 @@ export class AIService extends Context.Tag("AIService")<
 		>;
 		reply: (
 			conversation: (UserMessage | AssistantMessage)[],
-		) => Stream.Stream<AiResponse, AiError.AiError, never>;
+		) => Stream.Stream<
+			AiResponse,
+			AiError.AiError,
+			Handler<"create-flashcard">
+		>;
 		suggestFromSelection: (
 			selection: string,
 			instruction: string,
@@ -331,6 +355,7 @@ export const AIServiceLive = Layer.effect(
 				model.streamText({
 					system: replyPrompt,
 					prompt: conversation,
+					toolkit: FlashcardTools,
 				}),
 			suggestFromSelection: (selection, instruction, context, followups) =>
 				Effect.gen(function* () {
