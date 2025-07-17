@@ -63,7 +63,7 @@ function getDocumentInformation() {
 		${document.year ? `Year: ${document.year}` : ""}
 		</document information>\n
 		`;
-	}).pipe(Effect.provide(DocumentService.Default), Effect.runSync);
+	}).pipe(Effect.provide(DocumentService.Default));
 }
 
 export const gpt41 = OpenAiLanguageModel.model("gpt-4.1");
@@ -143,7 +143,7 @@ export const AIServiceLive = Layer.effect(
 						.generateText({
 							system: evaluate,
 							prompt: `
-            Document Information: ${getDocumentInformation()}
+            Document Information: ${yield* getDocumentInformation()}
 						---
             Context: ${context}
             ---
@@ -175,7 +175,7 @@ export const AIServiceLive = Layer.effect(
 						.generateText({
 							system: createPermutationsPrompt,
 							prompt: `
-            Document Information: ${getDocumentInformation()}
+            Document Information: ${yield* getDocumentInformation()}
 						---
             Context: ${context}
             ---
@@ -239,7 +239,7 @@ export const AIServiceLive = Layer.effect(
 						.generateText({
 							system: improveQuestionPrompt,
 							prompt: `
-						Document Information: ${getDocumentInformation()}
+						Document Information: ${yield* getDocumentInformation()}
 						---
 						Context: ${context}
             ---
@@ -271,7 +271,7 @@ export const AIServiceLive = Layer.effect(
 						.generateText({
 							system: augmentQuotePrompt,
 							prompt: `
-						Document Information: ${getDocumentInformation()}
+						Document Information: ${yield* getDocumentInformation()}
 						---
 						Context: ${context}
             ---
@@ -300,10 +300,7 @@ export const AIServiceLive = Layer.effect(
 
 			reply: (conversation) =>
 				model.streamText({
-					system: `${replyPrompt}
-            Document Information: ${getDocumentInformation()}
-						---
-            `,
+					system: replyPrompt,
 					prompt: conversation,
 				}),
 			suggestFromSelection: (selection, instruction, context) =>
@@ -312,7 +309,7 @@ export const AIServiceLive = Layer.effect(
 						.generateText({
 							system: suggestFromSelection,
 							prompt: `
-						Document Information: ${getDocumentInformation()}
+						Document Information: ${yield* getDocumentInformation()}
 						---
 							Context: ${context}
             ---
