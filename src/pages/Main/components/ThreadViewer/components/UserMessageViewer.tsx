@@ -9,7 +9,7 @@ export const UserMessageViewer = forwardRef<
     <div
       ref={ref}
       {...props}
-      className="flex w-max max-w-[75%] flex-col gap-2 rounded-lg px-3 py-2 text-sm bg-primary text-primary-foreground mt-3 mr-auto"
+      className="flex w-full flex-col gap-2 rounded-lg px-3 py-2 text-sm bg-primary text-primary-foreground mt-3"
     >
       {message.content.parts.map((part) => {
         if (part._tag === "TextPart") {
