@@ -282,7 +282,9 @@ function PermutationFlashcardComponent({
           >
             Add to thread
           </Button>
-          <Button onClick={() => savePermutationFlashcard()}>Save</Button>
+          <Button onClick={() => savePermutationFlashcard()}>
+            {permutation.noteId ? "Update" : "Save"}
+          </Button>
         </div>
       </div>
     </Card>
