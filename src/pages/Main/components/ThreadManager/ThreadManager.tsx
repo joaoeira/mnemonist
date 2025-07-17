@@ -181,8 +181,6 @@ export default function ThreadManager() {
 
   if (threads.length === 0) return <div>No threads</div>;
 
-  console.log(threads);
-
   return (
     <div className="flex h-full overflow-x-auto">
       {threads.map((thread, index) => (
