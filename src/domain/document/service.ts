@@ -9,7 +9,11 @@ import {
 	documentSchema,
 } from "./schema";
 
-class DocumentNotFound extends Data.TaggedError("DocumentNotFound")<{
+export class DocumentIdNotFound extends Data.TaggedError("DocumentIdNotFound")<{
+	message: string;
+}> {}
+
+export class DocumentNotFound extends Data.TaggedError("DocumentNotFound")<{
 	message: string;
 	id: string | undefined;
 	fingerprint: string | undefined;
@@ -19,6 +23,11 @@ class SessionIdNotFound extends Data.TaggedError("SessionIdNotFound")<{
 	message: string;
 	id: string | undefined;
 }> {}
+
+export type DocumentServiceErrors =
+	| DocumentIdNotFound
+	| DocumentNotFound
+	| SessionIdNotFound;
 
 class DocumentService extends Effect.Service<DocumentService>()(
 	"domain/DocumentService",

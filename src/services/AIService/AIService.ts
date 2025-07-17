@@ -14,6 +14,12 @@ import {
 	Schedule,
 	type Stream,
 } from "effect";
+import {
+	DocumentIdNotFound,
+	DocumentService,
+	type DocumentServiceErrors,
+} from "@/domain/document/service";
+import { documentIdAtom } from "@/pages/Main/atoms/documentIdAtom";
 import { augmentQuotePrompt } from "./prompts/augment-quote";
 import { createPermutationsPrompt } from "./prompts/create-permutations";
 import { evaluate } from "./prompts/evaluate";
@@ -35,6 +41,31 @@ export const AILayer = Layer.empty.pipe(
 	Layer.provideMerge(FetchHttpClient.layer),
 );
 
+function getDocumentInformation() {
+	return Effect.gen(function* () {
+		const documentId = documentIdAtom.get();
+		const documentService = yield* DocumentService;
+
+		if (!documentId) {
+			return yield* Effect.fail(
+				new DocumentIdNotFound({
+					message: "Document id not found.",
+				}),
+			);
+		}
+
+		const document = yield* documentService.findById(documentId);
+
+		return `
+		<document information>
+		${document.title ? `Document: ${document.title}` : ""}
+		${document.author ? `Author: ${document.author}` : ""}
+		${document.year ? `Year: ${document.year}` : ""}
+		</document information>\n
+		`;
+	}).pipe(Effect.provide(DocumentService.Default), Effect.runSync);
+}
+
 export const gpt41 = OpenAiLanguageModel.model("gpt-4.1");
 export const o3 = OpenAiLanguageModel.model("o3");
 export class AIService extends Context.Tag("AIService")<
@@ -46,7 +77,7 @@ export class AIService extends Context.Tag("AIService")<
 			context: string,
 		) => Effect.Effect<
 			string,
-			ConfigError.ConfigError | AiError.AiError,
+			ConfigError.ConfigError | AiError.AiError | DocumentServiceErrors,
 			never
 		>;
 		createPermutations: (
@@ -55,7 +86,7 @@ export class AIService extends Context.Tag("AIService")<
 			context: string,
 		) => Effect.Effect<
 			string,
-			ConfigError.ConfigError | AiError.AiError,
+			ConfigError.ConfigError | AiError.AiError | DocumentServiceErrors,
 			never
 		>;
 		improveAnswer: (
@@ -64,7 +95,7 @@ export class AIService extends Context.Tag("AIService")<
 			context: string,
 		) => Effect.Effect<
 			string,
-			ConfigError.ConfigError | AiError.AiError,
+			ConfigError.ConfigError | AiError.AiError | DocumentServiceErrors,
 			never
 		>;
 		improveQuestion: (
@@ -73,7 +104,7 @@ export class AIService extends Context.Tag("AIService")<
 			context: string,
 		) => Effect.Effect<
 			string,
-			ConfigError.ConfigError | AiError.AiError,
+			ConfigError.ConfigError | AiError.AiError | DocumentServiceErrors,
 			never
 		>;
 		augmentQuote: (
@@ -82,7 +113,7 @@ export class AIService extends Context.Tag("AIService")<
 			context: string,
 		) => Effect.Effect<
 			string,
-			ConfigError.ConfigError | AiError.AiError,
+			ConfigError.ConfigError | AiError.AiError | DocumentServiceErrors,
 			never
 		>;
 		reply: (
@@ -94,7 +125,7 @@ export class AIService extends Context.Tag("AIService")<
 			context: string,
 		) => Effect.Effect<
 			string,
-			ConfigError.ConfigError | AiError.AiError,
+			ConfigError.ConfigError | AiError.AiError | DocumentServiceErrors,
 			never
 		>;
 	}
@@ -112,6 +143,8 @@ export const AIServiceLive = Layer.effect(
 						.generateText({
 							system: evaluate,
 							prompt: `
+            Document Information: ${getDocumentInformation()}
+						---
             Context: ${context}
             ---
             Question: ${question}
@@ -142,6 +175,8 @@ export const AIServiceLive = Layer.effect(
 						.generateText({
 							system: createPermutationsPrompt,
 							prompt: `
+            Document Information: ${getDocumentInformation()}
+						---
             Context: ${context}
             ---
             Original Question: ${question}
@@ -172,7 +207,9 @@ export const AIServiceLive = Layer.effect(
 						.generateText({
 							system: improveAnswerPrompt,
 							prompt: `
-            Context: ${context}
+						Document Information: ${getDocumentInformation()}
+						---
+						Context: ${context}
             ---
             Question: ${question}
             Answer: ${answer}
@@ -202,7 +239,9 @@ export const AIServiceLive = Layer.effect(
 						.generateText({
 							system: improveQuestionPrompt,
 							prompt: `
-            Context: ${context}
+						Document Information: ${getDocumentInformation()}
+						---
+						Context: ${context}
             ---
             Question: ${question}
             Answer: ${answer}
@@ -232,7 +271,9 @@ export const AIServiceLive = Layer.effect(
 						.generateText({
 							system: augmentQuotePrompt,
 							prompt: `
-            Context: ${context}
+						Document Information: ${getDocumentInformation()}
+						---
+						Context: ${context}
             ---
             Question: ${question}
             Answer: ${answer}
@@ -259,7 +300,10 @@ export const AIServiceLive = Layer.effect(
 
 			reply: (conversation) =>
 				model.streamText({
-					system: replyPrompt,
+					system: `${replyPrompt}
+            Document Information: ${getDocumentInformation()}
+						---
+            `,
 					prompt: conversation,
 				}),
 			suggestFromSelection: (selection, instruction, context) =>
@@ -268,7 +312,9 @@ export const AIServiceLive = Layer.effect(
 						.generateText({
 							system: suggestFromSelection,
 							prompt: `
-            Context: ${context}
+						Document Information: ${getDocumentInformation()}
+						---
+							Context: ${context}
             ---
             Selected Text: ${selection}
             User Instruction: ${instruction}
