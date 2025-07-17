@@ -130,6 +130,7 @@ export class AIService extends Context.Tag("AIService")<
 			selection: string,
 			instruction: string,
 			context: string,
+			followups?: (UserMessage | AssistantMessage)[],
 		) => Effect.Effect<
 			string,
 			ConfigError.ConfigError | AiError.AiError | DocumentServiceErrors,
@@ -331,22 +332,29 @@ export const AIServiceLive = Layer.effect(
 					system: replyPrompt,
 					prompt: conversation,
 				}),
-			suggestFromSelection: (selection, instruction, context) =>
+			suggestFromSelection: (selection, instruction, context, followups) =>
 				Effect.gen(function* () {
 					const response = yield* model
 						.generateText({
 							system: suggestFromSelection,
-							prompt: `
-						Document Information: ${yield* getDocumentInformation()}
-						---
-							Context: ${context}
-            ---
-            Selected Text: ${selection}
-            User Instruction: ${instruction}
-            ---
-            \n\n
-            Please create flashcards based on the selected text and user instruction following the guidelines in the system prompt.
-            `,
+							prompt: [
+								UserMessage.make({
+									parts: [
+										TextPart.make({
+											text: `
+										Document Information: ${yield* getDocumentInformation()}
+										---
+										Context: ${context}
+										---
+										Selected Text: ${selection}
+										User Instruction: ${instruction}
+										---
+										`,
+										}),
+									],
+								}),
+								...(followups || []),
+							],
 						})
 						.pipe(
 							Effect.withExecutionPlan(
