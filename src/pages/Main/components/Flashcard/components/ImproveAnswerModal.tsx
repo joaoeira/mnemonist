@@ -177,12 +177,7 @@ export function ImproveAnswerModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent
-        className="max-w-2xl max-h-[80vh] overflow-y-auto"
-        onInteractOutside={(e) => {
-          e.preventDefault();
-        }}
-      >
+      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Improve Answer</DialogTitle>
         </DialogHeader>

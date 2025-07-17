@@ -355,12 +355,7 @@ export function FlashcardPermutationModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent
-        className="w-2xl max-h-[60vh] overflow-y-auto"
-        onInteractOutside={(e) => {
-          e.preventDefault();
-        }}
-      >
+      <DialogContent className="w-2xl max-h-[60vh] overflow-y-auto">
         <div className="flex flex-col gap-4">
           {state.permutations.map((permutation) => (
             <PermutationFlashcardComponent
