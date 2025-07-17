@@ -11,11 +11,7 @@ import type { Thread } from "@/domain/thread/schema";
 import { ThreadService } from "@/domain/thread/service";
 import { fileAtom } from "@/pages/Main/atoms/fileAtom";
 import { pageAtom } from "@/pages/Main/atoms/pageAtom";
-import {
-  AIService,
-  AIServiceComplete,
-  AIServiceReasoning,
-} from "@/services/AIService/AIService";
+import { AIService, AIServiceReasoning } from "@/services/AIService/AIService";
 import { PDFService } from "@/services/PDFService";
 import RichTextArea from "../../FlaschardPanel/components/RichTextArea/RichTextArea";
 

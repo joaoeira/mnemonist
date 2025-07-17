@@ -1,5 +1,5 @@
 import { type AiError, AiLanguageModel } from "@effect/ai";
-import type { AssistantMessage, UserMessage } from "@effect/ai/AiInput";
+import { AssistantMessage, TextPart, UserMessage } from "@effect/ai/AiInput";
 import type { AiResponse } from "@effect/ai/AiResponse";
 import { OpenAiClient, OpenAiLanguageModel } from "@effect/ai-openai";
 import { FetchHttpClient } from "@effect/platform";
@@ -93,6 +93,7 @@ export class AIService extends Context.Tag("AIService")<
 			question: string,
 			answer: string,
 			context: string,
+			followups?: (UserMessage | AssistantMessage)[],
 		) => Effect.Effect<
 			string,
 			ConfigError.ConfigError | AiError.AiError | DocumentServiceErrors,
@@ -201,22 +202,29 @@ export const AIServiceLive = Layer.effect(
 
 					return response.text;
 				}),
-			improveAnswer: (question, answer, context) =>
+			improveAnswer: (question, answer, context, followups) =>
 				Effect.gen(function* () {
 					const response = yield* model
 						.generateText({
 							system: improveAnswerPrompt,
-							prompt: `
-						Document Information: ${getDocumentInformation()}
-						---
-						Context: ${context}
-            ---
-            Question: ${question}
-            Answer: ${answer}
-            ---
-            \n\n
-            Please provide three improved versions of the answer following the guidelines in the system prompt.
-            `,
+							prompt: [
+								UserMessage.make({
+									parts: [
+										TextPart.make({
+											text: `
+										Document Information: ${yield* getDocumentInformation()}
+										---
+										Context: ${context}
+										---
+										Question: ${question}
+										Answer: ${answer}
+										---
+										`,
+										}),
+									],
+								}),
+								...(followups || []),
+							],
 						})
 						.pipe(
 							Effect.withExecutionPlan(
