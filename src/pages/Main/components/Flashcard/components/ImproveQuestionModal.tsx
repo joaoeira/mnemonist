@@ -1,15 +1,18 @@
+import { AssistantMessage, TextPart, UserMessage } from "@effect/ai/AiInput";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Effect, Schema } from "effect";
 import { jsonrepair } from "jsonrepair";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { FlashcardService } from "@/domain/flashcard/service";
 import type { Thread } from "@/domain/thread/schema";
 import { fileAtom } from "@/pages/Main/atoms/fileAtom";
@@ -22,7 +25,11 @@ const improvedQuestionsSchema = Schema.Struct({
   questions: Schema.Array(Schema.String),
 });
 
-function improveQuestionEffect(question: string, answer: string) {
+function improveQuestionEffect(
+  question: string,
+  answer: string,
+  followups?: (UserMessage | AssistantMessage)[]
+) {
   const program = Effect.gen(function* () {
     const aiService = yield* AIService;
     const pdfService = yield* PDFService;
@@ -41,7 +48,12 @@ function improveQuestionEffect(question: string, answer: string) {
     const arrayBuffer = yield* Effect.promise(() => response.arrayBuffer());
     const context = yield* pdfService.getPageContext(arrayBuffer, page);
 
-    const result = yield* aiService.improveQuestion(question, answer, context);
+    const result = yield* aiService.improveQuestion(
+      question,
+      answer,
+      context,
+      followups
+    );
 
     const json = yield* Effect.sync(() => JSON.parse(jsonrepair(result)));
     const improvedQuestions = yield* Schema.decodeUnknown(
@@ -118,13 +130,26 @@ export function ImproveQuestionModal({
   flashcard,
   threadId,
 }: ImproveQuestionModalProps) {
-  const [improvedQuestions, setImprovedQuestions] = useState<string[]>([]);
   const queryClient = useQueryClient();
+  const followupTextAreaRef = useRef<HTMLTextAreaElement>(null);
+
+  const [improvedQuestions, setImprovedQuestions] = useState<string[]>([]);
+  const [followups, setFollowups] = useState<
+    (UserMessage | AssistantMessage)[]
+  >([]);
 
   const { mutate: improveQuestion, isPending } = useMutation({
-    mutationFn: ({ question, answer }: { question: string; answer: string }) =>
+    mutationFn: ({
+      question,
+      answer,
+      followups,
+    }: {
+      question: string;
+      answer: string;
+      followups?: (UserMessage | AssistantMessage)[];
+    }) =>
       Effect.runPromise(
-        improveQuestionEffect(question, answer).pipe(
+        improveQuestionEffect(question, answer, followups).pipe(
           Effect.provide(AIServiceComplete),
           Effect.provide(PDFService.Default)
         )
@@ -158,12 +183,14 @@ export function ImproveQuestionModal({
         queryKey: ["threadItems", threadId],
       });
       setImprovedQuestions([]);
+      setFollowups([]);
     },
   });
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: we want to reset the improved questions when the flashcard question changes
   useEffect(() => {
     setImprovedQuestions([]);
+    setFollowups([]);
   }, [flashcard.question]);
 
   useEffect(() => {
@@ -211,6 +238,62 @@ export function ImproveQuestionModal({
             </div>
           )}
         </div>
+        <DialogFooter>
+          <Textarea
+            ref={followupTextAreaRef}
+            disabled={isPending}
+            placeholder="Ask a follow-up question to refine the suggestions..."
+            className="w-full bg-accent-foreground/70 h-20 resize-none"
+            onKeyDown={(e) => {
+              console.log(
+                "onKeyDown",
+                e.key === "Enter" && !e.shiftKey,
+                followupTextAreaRef.current?.value.trim()
+              );
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                if (
+                  !followupTextAreaRef.current ||
+                  isPending ||
+                  followupTextAreaRef.current.value.trim() === ""
+                )
+                  return;
+
+                const assistantMessage = AssistantMessage.make({
+                  parts: [
+                    TextPart.make({
+                      text: `<previous suggestions>\n
+                  ${improvedQuestions.map((a) => `<p>${a}</p>`).join("\n")}
+                  </previous suggestions>\n
+                  `,
+                    }),
+                  ],
+                });
+
+                const userMessage = UserMessage.make({
+                  parts: [
+                    TextPart.make({
+                      text: followupTextAreaRef.current?.value.trim(),
+                    }),
+                  ],
+                });
+
+                setFollowups((prev) => [
+                  ...prev,
+                  assistantMessage,
+                  userMessage,
+                ]);
+                improveQuestion({
+                  question: flashcard.question,
+                  answer: flashcard.answer,
+                  followups: [...followups, assistantMessage, userMessage],
+                });
+
+                followupTextAreaRef.current.value = "";
+              }
+            }}
+          />
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

@@ -103,6 +103,7 @@ export class AIService extends Context.Tag("AIService")<
 			question: string,
 			answer: string,
 			context: string,
+			followups?: (UserMessage | AssistantMessage)[],
 		) => Effect.Effect<
 			string,
 			ConfigError.ConfigError | AiError.AiError | DocumentServiceErrors,
@@ -241,22 +242,29 @@ export const AIServiceLive = Layer.effect(
 
 					return response.text;
 				}),
-			improveQuestion: (question, answer, context) =>
+			improveQuestion: (question, answer, context, followups) =>
 				Effect.gen(function* () {
 					const response = yield* model
 						.generateText({
 							system: improveQuestionPrompt,
-							prompt: `
-						Document Information: ${yield* getDocumentInformation()}
-						---
-						Context: ${context}
-            ---
-            Question: ${question}
-            Answer: ${answer}
-            ---
-            \n\n
-            Please provide three improved versions of the question following the guidelines in the system prompt.
-            `,
+							prompt: [
+								UserMessage.make({
+									parts: [
+										TextPart.make({
+											text: `
+										Document Information: ${yield* getDocumentInformation()}
+										---
+										Context: ${context}
+										---
+										Question: ${question}
+										Answer: ${answer}
+										---
+										`,
+										}),
+									],
+								}),
+								...(followups || []),
+							],
 						})
 						.pipe(
 							Effect.withExecutionPlan(
