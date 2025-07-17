@@ -1,5 +1,9 @@
 import { type AiError, AiLanguageModel } from "@effect/ai";
-import { AssistantMessage, TextPart, UserMessage } from "@effect/ai/AiInput";
+import {
+	type AssistantMessage,
+	TextPart,
+	UserMessage,
+} from "@effect/ai/AiInput";
 import type { AiResponse } from "@effect/ai/AiResponse";
 import { OpenAiClient, OpenAiLanguageModel } from "@effect/ai-openai";
 import { FetchHttpClient } from "@effect/platform";
@@ -84,6 +88,7 @@ export class AIService extends Context.Tag("AIService")<
 			question: string,
 			answer: string,
 			context: string,
+			followups?: (UserMessage | AssistantMessage)[],
 		) => Effect.Effect<
 			string,
 			ConfigError.ConfigError | AiError.AiError | DocumentServiceErrors,
@@ -171,22 +176,29 @@ export const AIServiceLive = Layer.effect(
 
 					return response.text;
 				}),
-			createPermutations: (question, answer, context) =>
+			createPermutations: (question, answer, context, followups) =>
 				Effect.gen(function* () {
 					const response = yield* model
 						.generateText({
 							system: createPermutationsPrompt,
-							prompt: `
-            Document Information: ${yield* getDocumentInformation()}
-						---
-            Context: ${context}
-            ---
-            Original Question: ${question}
-            Original Answer: ${answer}
-            ---
-            \n\n
-            Please create diverse permutation cards based on the original question and answer above. Follow the guidelines and examples provided in the system prompt.
-            `,
+							prompt: [
+								UserMessage.make({
+									parts: [
+										TextPart.make({
+											text: `
+										Document Information: ${yield* getDocumentInformation()}
+										---
+										Context: ${context}
+										---
+										Original Question: ${question}
+										Original Answer: ${answer}
+										---
+										`,
+										}),
+									],
+								}),
+								...(followups || []),
+							],
 						})
 						.pipe(
 							Effect.withExecutionPlan(

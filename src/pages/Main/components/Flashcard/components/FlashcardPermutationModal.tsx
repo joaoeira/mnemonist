@@ -1,12 +1,14 @@
+import { AssistantMessage, TextPart, UserMessage } from "@effect/ai/AiInput";
 import { FetchHttpClient } from "@effect/platform";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAtom } from "@xstate/store/react";
 import { Effect, Schema } from "effect";
 import { jsonrepair } from "jsonrepair";
-import { useEffect, useReducer } from "react";
+import { useEffect, useReducer, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import type { Document } from "@/domain/document/schema";
 import { DocumentService } from "@/domain/document/service";
 import { FlashcardService } from "@/domain/flashcard/service";
@@ -43,6 +45,7 @@ const permutationsSchema = Schema.Struct({
 
 interface PermutationsState {
   permutations: PermutationFlashcard[];
+  followups: (UserMessage | AssistantMessage)[];
 }
 
 type PermutationsAction =
@@ -50,7 +53,9 @@ type PermutationsAction =
   | { type: "ADD_PERMUTATION"; payload: PermutationFlashcard }
   | { type: "EDIT_QUESTION"; payload: { id: string; question: string } }
   | { type: "EDIT_ANSWER"; payload: { id: string; answer: string } }
-  | { type: "SET_NOTE_ID"; payload: { id: string; noteId: number } };
+  | { type: "SET_NOTE_ID"; payload: { id: string; noteId: number } }
+  | { type: "SET_FOLLOWUPS"; payload: (UserMessage | AssistantMessage)[] }
+  | { type: "RESET_FOLLOWUPS" };
 
 function permutationsReducer(
   state: PermutationsState,
@@ -91,6 +96,16 @@ function permutationsReducer(
             : p
         ),
       };
+    case "SET_FOLLOWUPS":
+      return {
+        ...state,
+        followups: action.payload,
+      };
+    case "RESET_FOLLOWUPS":
+      return {
+        ...state,
+        followups: [],
+      };
     default:
       return state;
   }
@@ -98,9 +113,14 @@ function permutationsReducer(
 
 const initialPermutationsState: PermutationsState = {
   permutations: [],
+  followups: [],
 };
 
-function createPermutationsEffect(question: string, answer: string) {
+function createPermutationsEffect(
+  question: string,
+  answer: string,
+  followups?: (UserMessage | AssistantMessage)[]
+) {
   const program = Effect.gen(function* () {
     const aiService = yield* AIService;
     const pdfService = yield* PDFService;
@@ -121,7 +141,8 @@ function createPermutationsEffect(question: string, answer: string) {
     const result = yield* aiService.createPermutations(
       question,
       answer,
-      context
+      context,
+      followups
     );
 
     const json = yield* Effect.sync(() => JSON.parse(jsonrepair(result)));
@@ -308,11 +329,20 @@ export function FlashcardPermutationModal({
     permutationsReducer,
     initialPermutationsState
   );
+  const followupTextAreaRef = useRef<HTMLTextAreaElement>(null);
 
-  const { mutate: createPermutations } = useMutation({
-    mutationFn: ({ question, answer }: { question: string; answer: string }) =>
+  const { mutate: createPermutations, isPending } = useMutation({
+    mutationFn: ({
+      question,
+      answer,
+      followups,
+    }: {
+      question: string;
+      answer: string;
+      followups?: (UserMessage | AssistantMessage)[];
+    }) =>
       Effect.runPromise(
-        createPermutationsEffect(question, answer).pipe(
+        createPermutationsEffect(question, answer, followups).pipe(
           Effect.provide(AIServiceComplete),
           Effect.provide(PDFService.Default)
         )
@@ -337,21 +367,17 @@ export function FlashcardPermutationModal({
       type: "SET_PERMUTATIONS",
       payload: [],
     });
+    dispatch({
+      type: "RESET_FOLLOWUPS",
+    });
   }, [flashcard.question, flashcard.answer]);
 
   useEffect(() => {
     if (isOpen && state.permutations.length === 0) {
-      createPermutations(
-        {
-          question: flashcard.question,
-          answer: flashcard.answer,
-        },
-        {
-          onSuccess: (result) => {
-            console.log(result);
-          },
-        }
-      );
+      createPermutations({
+        question: flashcard.question,
+        answer: flashcard.answer,
+      });
     }
   }, [isOpen, flashcard, createPermutations, state.permutations.length]);
 
@@ -359,6 +385,12 @@ export function FlashcardPermutationModal({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="w-2xl max-h-[60vh] overflow-y-auto">
         <div className="flex flex-col gap-4">
+          {isPending && (
+            <div className="text-center py-4 text-muted-foreground">
+              Generating permutation cards...
+            </div>
+          )}
+
           {state.permutations.map((permutation) => (
             <PermutationFlashcardComponent
               key={permutation.id}
@@ -379,6 +411,65 @@ export function FlashcardPermutationModal({
             />
           ))}
         </div>
+        <DialogFooter>
+          <Textarea
+            ref={followupTextAreaRef}
+            disabled={isPending}
+            placeholder="Ask a follow-up question or provide feedback to refine the permutations..."
+            className="w-full bg-accent-foreground/70 h-20 resize-none"
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                if (
+                  !followupTextAreaRef.current ||
+                  isPending ||
+                  followupTextAreaRef.current.value.trim() === ""
+                )
+                  return;
+
+                const assistantMessage = AssistantMessage.make({
+                  parts: [
+                    TextPart.make({
+                      text: `<previous suggestions>\n
+                  ${state.permutations
+                    .map((p) => `Question: ${p.question}\nAnswer: ${p.answer}`)
+                    .join("\n\n")}
+                  </previous suggestions>\n
+                  `,
+                    }),
+                  ],
+                });
+
+                const userMessage = UserMessage.make({
+                  parts: [
+                    TextPart.make({
+                      text: followupTextAreaRef.current?.value.trim(),
+                    }),
+                  ],
+                });
+
+                const newFollowups = [
+                  ...state.followups,
+                  assistantMessage,
+                  userMessage,
+                ];
+
+                dispatch({
+                  type: "SET_FOLLOWUPS",
+                  payload: newFollowups,
+                });
+
+                createPermutations({
+                  question: flashcard.question,
+                  answer: flashcard.answer,
+                  followups: newFollowups,
+                });
+
+                followupTextAreaRef.current.value = "";
+              }
+            }}
+          />
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
