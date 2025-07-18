@@ -27,6 +27,28 @@ const validatePageNumber = (pageNumber: number, totalPages: number) =>
 		return validatedPageNumber;
 	});
 
+/**
+ * Creates a managed PDF document resource that will be automatically cleaned up
+ * @param pdfData - The PDF file as a Uint8Array, ArrayBuffer, or similar format
+ * @returns Effect that provides a scoped PDF document
+ */
+const acquirePdfDocument = (pdfData: Uint8Array | ArrayBuffer) =>
+	Effect.acquireRelease(
+		Effect.promise(() => {
+			const loadingTask = pdfjsLib.getDocument({
+				data: new Uint8Array(pdfData.slice(0)),
+				disableAutoFetch: true,
+				disableStream: true,
+				disableRange: true,
+			});
+			return loadingTask.promise;
+		}),
+		(pdfDocument) =>
+			Effect.sync(() => {
+				pdfDocument.destroy();
+			}),
+	);
+
 class PDFService extends Effect.Service<PDFService>()("PDFService", {
 	effect: Effect.sync(() => ({
 		/**
@@ -36,10 +58,7 @@ class PDFService extends Effect.Service<PDFService>()("PDFService", {
 		 */
 		fingerprint: (pdfData: Uint8Array | ArrayBuffer) =>
 			Effect.gen(function* () {
-				const loadingTask = pdfjsLib.getDocument({
-					data: new Uint8Array(pdfData.slice(0)),
-				});
-				const pdfDocument = yield* Effect.promise(() => loadingTask.promise);
+				const pdfDocument = yield* acquirePdfDocument(pdfData);
 
 				const fingerprints = pdfDocument.fingerprints;
 				const fingerprint = fingerprints[0];
@@ -51,7 +70,7 @@ class PDFService extends Effect.Service<PDFService>()("PDFService", {
 				}
 
 				return fingerprint;
-			}),
+			}).pipe(Effect.scoped),
 
 		/**
 		 * Gets the total number of pages in a PDF document
@@ -60,13 +79,9 @@ class PDFService extends Effect.Service<PDFService>()("PDFService", {
 		 */
 		getPageCount: (pdfData: Uint8Array | ArrayBuffer) =>
 			Effect.gen(function* () {
-				const loadingTask = pdfjsLib.getDocument({
-					data: new Uint8Array(pdfData.slice(0)),
-				});
-				const pdfDocument = yield* Effect.promise(() => loadingTask.promise);
-
+				const pdfDocument = yield* acquirePdfDocument(pdfData);
 				return pdfDocument.numPages;
-			}),
+			}).pipe(Effect.scoped),
 
 		/**
 		 * Extracts text content from a specific page
@@ -76,11 +91,7 @@ class PDFService extends Effect.Service<PDFService>()("PDFService", {
 		 */
 		getPageText: (pdfData: Uint8Array | ArrayBuffer, pageNumber: number) =>
 			Effect.gen(function* () {
-				const loadingTask = pdfjsLib.getDocument({
-					data: new Uint8Array(pdfData.slice(0)),
-				});
-				const pdfDocument = yield* Effect.promise(() => loadingTask.promise);
-
+				const pdfDocument = yield* acquirePdfDocument(pdfData);
 				const totalPages = pdfDocument.numPages;
 
 				const validatedPageNumber = yield* validatePageNumber(
@@ -113,7 +124,7 @@ class PDFService extends Effect.Service<PDFService>()("PDFService", {
 					.join(" ");
 
 				return pageText;
-			}),
+			}).pipe(Effect.scoped),
 
 		/**
 		 * Gets page text with surrounding context pages
@@ -123,10 +134,7 @@ class PDFService extends Effect.Service<PDFService>()("PDFService", {
 		 */
 		getPageContext: (pdfData: Uint8Array | ArrayBuffer, pageNumber: number) =>
 			Effect.gen(function* () {
-				const loadingTask = pdfjsLib.getDocument({
-					data: new Uint8Array(pdfData.slice(0)),
-				});
-				const pdfDocument = yield* Effect.promise(() => loadingTask.promise);
+				const pdfDocument = yield* acquirePdfDocument(pdfData);
 				const totalPages = pdfDocument.numPages;
 
 				const validatedPageNumber = yield* validatePageNumber(
@@ -156,16 +164,24 @@ class PDFService extends Effect.Service<PDFService>()("PDFService", {
 
 				const getPageTextSafe = (pageNum: number) =>
 					Effect.gen(function* () {
-						const pdfService = yield* PDFService;
-						const pageText = yield* pdfService
-							.getPageText(new Uint8Array(pdfData.slice(0)), pageNum)
-							.pipe(
-								Effect.catchTag("InvalidPageNumber", () => {
-									return Effect.succeed("");
-								}),
-							);
+						const page = yield* Effect.promise(() =>
+							pdfDocument.getPage(pageNum),
+						);
+						const textContent = yield* Effect.promise(() =>
+							page.getTextContent(),
+						);
+
+						const pageText = textContent.items
+							.map((item) => {
+								if ("str" in item) {
+									return item.str;
+								}
+								return "";
+							})
+							.join(" ");
+
 						return pageText;
-					}).pipe(Effect.provide(PDFService.Default));
+					}).pipe(Effect.catchAll(() => Effect.succeed("")));
 
 				const contextTexts = yield* Effect.all(
 					contextPages.map((pageNum) => getPageTextSafe(pageNum)),
@@ -178,7 +194,7 @@ class PDFService extends Effect.Service<PDFService>()("PDFService", {
 				const result = `<context>\n${contextString}\n</context>\n<current page>\n${currentPageText}\n</current page>`;
 
 				return result;
-			}),
+			}).pipe(Effect.scoped),
 	})),
 }) {}
 
