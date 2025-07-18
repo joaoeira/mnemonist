@@ -63,7 +63,10 @@ function improveAnswerEffect(
     return improvedAnswers.answers.map((a) => `<p>${a}</p>`);
   });
 
-  return program;
+  return program.pipe(
+    Effect.provide(AIServiceComplete),
+    Effect.provide(PDFService.Default)
+  );
 }
 
 function updateFlashcardEffect(
@@ -144,13 +147,7 @@ export function ImproveAnswerModal({
       question: string;
       answer: string;
       followups?: (UserMessage | AssistantMessage)[];
-    }) =>
-      Effect.runPromise(
-        improveAnswerEffect(question, answer, followups).pipe(
-          Effect.provide(AIServiceComplete),
-          Effect.provide(PDFService.Default)
-        )
-      ),
+    }) => Effect.runPromise(improveAnswerEffect(question, answer, followups)),
     retry: 0,
     onError: (
       error: Effect.Effect.Error<ReturnType<typeof improveAnswerEffect>>

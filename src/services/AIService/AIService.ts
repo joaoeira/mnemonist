@@ -122,7 +122,7 @@ export class AIService extends Context.Tag("AIService")<
 		) => Effect.Effect<
 			string,
 			ConfigError.ConfigError | AiError.AiError | DocumentServiceErrors,
-			Effect.Effect.Context<typeof FlashcardTools>
+			never
 		>;
 		improveQuestion: (
 			question: string,
